@@ -1,15 +1,15 @@
 ## almanac - a calendar viewer written in lua for unix systems
 
-author: Colum Paget (colums.projects@gmail.com)
-licence: GPLv3
+author: Colum Paget (colums.projects@gmail.com)  
+licence: GPLv3  
 
 Almanac is a calendar app that can download events from google calendars, meetup.com calendars, rss feeds with xCal extensions and iCal/ics feeds. It can also insert events into a google calendar.
 
 To use almanac you will need to have the following installed:
 
-lua              http://www.lua.org                          at least version 5.3
-libUseful        http://github.com/ColumPaget/libUseful      at least verson 3.6
-libUseful-lua    http://github.com/ColumPaget/libUseful-lua  at least version 1.2
+lua              http://www.lua.org                          at least version 5.3  
+libUseful        http://github.com/ColumPaget/libUseful      at least verson 3.6  
+libUseful-lua    http://github.com/ColumPaget/libUseful-lua  at least version 1.2  
 
 you will need swig (http://www.swig.org) installed to compile libUseful-lua
 
