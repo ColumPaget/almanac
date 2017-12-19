@@ -45,11 +45,14 @@ str=strutil.httpQuote("urn:ietf:wg:oauth:2.0:oob");
 OA:set("redirect_uri", str);
 OA:stage1("https://accounts.google.com/o/oauth2/v2/auth");
 
+print()
+print("GOOGLE CALENDAR REQUIRES OAUTH LOGIN. Goto the url below, grant permission, and then copy the resulting code into this app.");
+print()
 print("GOTO: ".. OA:auth_url());
 
 OA:listen(8989, "https://www.googleapis.com/oauth2/v4/token");
 OA:save("");
-print("AUTH: "..OA:access_token())
+print()
 end
 
 
@@ -260,6 +263,13 @@ end
 function GCalAddEvent(calendars, NewEvent)
 local url, S, text, doc, cal, Tokens
 
+if OA==nil
+then
+	OA=oauth.OAUTH("auth","gcal",ClientID, ClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	if OA:load() == 0 then OAuthGet(OA) end
+end
+
+
 Tokens=strutil.TOKENIZER(calendars,",")
 cal=Tokens:next()
 while cal ~= nil
@@ -267,8 +277,6 @@ do
 cal=string.sub(cal,3)
 if strutil.strlen(cal) > 0
 then
-print("CAL: "..cal)
-
 url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events"
 text="{\n\"summary\": \"" .. strutil.quoteChars(NewEvent.Title, "\n\"") .. "\",\n"
 if strutil.strlen(NewEvent.Location) > 0 then text=text.."\"location\": \"".. strutil.quoteChars(NewEvent.Location, "\n\"") .."\",\n" end
@@ -279,10 +287,8 @@ text=text.."\"end\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ
 text=text.. "}"
 S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. string.len(text))
 
-print("UP: "..text)
 S:writeln(text)
 doc=S:readdoc()
-print("REPLY: "..doc);
 S:close()
 end
 
@@ -321,6 +327,11 @@ end
 function GCalLoadCalendar(Collated, cal)
 local S, P, Events, Item, doc, url
 
+if OA==nil
+then
+	OA=oauth.OAUTH("auth","gcal",ClientID, ClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	if OA:load() == 0 then OAuthGet(OA) end
+end
 
 url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events?singleEvents=true"
 if EventsStart > 0 then url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", EventsStart)) end
@@ -693,7 +704,7 @@ for i,v in ipairs(args)
 do
 
 if v=="d" or v=="-day"       then EventsEnd=Now + 3600 * 24 * ParseNumericArg(args,i)
-elseif v=="w" or v=="-week"       then EventsEnd=Now + 3600 * 24 * 7 * ParseNumericArg(args,i)
+elseif v=="-w" or v=="-week"       then EventsEnd=Now + 3600 * 24 * 7 * ParseNumericArg(args,i)
 elseif v=="-m" or v=="-month" then EventsEnd=Now + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
 elseif v=="-y" or v=="-year" then EventsEnd=Now + 3600 * 24 * 365 * ParseNumericArg(args,i)
 elseif v=="-detail"
@@ -768,11 +779,8 @@ end
 
 
 
+
 --Main starts here
-OA=oauth.OAUTH("auth","gcal",ClientID, ClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
-if OA:load() == 0 then OAuthGet(OA) end
-
-
 callist,hides=ParseCommandLine(arg)
 
 T=strutil.TOKENIZER(callist,",")
