@@ -9,7 +9,7 @@ require("time")
 
 --process.lu_set("HTTP:Debug","true")
 
-VERSION="1.2"
+VERSION="1.3"
 ClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
 ClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
 Collated={}
