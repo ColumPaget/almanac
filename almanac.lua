@@ -33,6 +33,7 @@ Event.Status=""
 Event.Location=""
 Event.Details=""
 Event.Visibility=""
+Event.Start=0
 Event.End=0
 
 return Event
@@ -130,7 +131,6 @@ if string.sub(str,1,5) =="TZID=" then Timezone=string.sub(str,6) end
 str=Tokens:next()
 end
 
-print("TZ="..Timezone)
 return(time.tosecs("%Y%m%dT%H%M%S", value, Timezone))
 end
 
@@ -791,6 +791,7 @@ if string.len(cal) > 0
 then
 	if string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Collated, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Collated, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Collated, "http://" .. string.sub(cal, 8))
 	else DocumentLoadEvents(Collated, cal)
 	end
 end

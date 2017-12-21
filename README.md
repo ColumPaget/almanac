@@ -46,6 +46,12 @@ https://www.snb.ch/en/mmr/events/id/calendar_full_2018.en.ics      - Bank of Swi
 http://rss.royalsociety.org/events/upcoming    - Royal society events
 ```
 
+You can find a bunch of ical calendars here:
+
+```
+http://icalshare.com/
+```
+
 If you find any other public calendars that people might be interested in, you can email them to me at 'colums.projects@gmail.com' and I'll add them to this list
 
 ## Usage
