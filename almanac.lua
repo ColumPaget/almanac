@@ -254,6 +254,8 @@ then
 	else
 		ICalLoadEvents(Events, S)
 	end
+else
+print(terminal.format("~rerror: cannot open '"..url.."'~0"))
 end
 
 end
@@ -645,6 +647,8 @@ print("Currently only .ical or .ics files can be loaded from disk.")
 print("Events can also be uploaded to google calendars that the user has permission for.")
 print()
 print("options:")
+print("   -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -d <n>      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -day  <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
@@ -702,12 +706,12 @@ local NewEvent={}
 NewEvent.Visibility="default"
 for i,v in ipairs(args)
 do
-
-if v=="d" or v=="-day"       then EventsEnd=Now + 3600 * 24 * ParseNumericArg(args,i)
+if v=="-h" or v=="-hour"       then EventsEnd=Now + 3600 * ParseNumericArg(args,i)
+elseif v=="-d" or v=="-day"       then EventsEnd=Now + 3600 * 24 * ParseNumericArg(args,i)
 elseif v=="-w" or v=="-week"       then EventsEnd=Now + 3600 * 24 * 7 * ParseNumericArg(args,i)
 elseif v=="-m" or v=="-month" then EventsEnd=Now + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
 elseif v=="-y" or v=="-year" then EventsEnd=Now + 3600 * 24 * 365 * ParseNumericArg(args,i)
-elseif v=="-detail"
+elseif v=="-detail" or v=="-v"
 then
 	ShowDetail=true
 elseif v=="-add"
@@ -724,13 +728,13 @@ then
 	NewEvent.Title=args[i+1]
 	NewEvent.Visibility="private"
 	args[i+1]=""
-elseif v=="-start"
+elseif v=="-s" or v=="-start"
 then
-	NewEvent.Start=ParseDate(args[i+1])
+	EventsStart=ParseDate(args[i+1])
 	args[i+1]=""
 elseif v=="-end"
 then
-	NewEvent.End=ParseDate(args[i+1])
+	EventsEnd=ParseDate(args[i+1])
 	args[i+1]=""
 elseif v=="-at" or v=="-where" or v=="-location"
 then
@@ -768,6 +772,12 @@ end
 
 if strutil.strlen(calendars)==0 then calendars="g:primary" end
 if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
+
+if strutil.strlen(NewEvent.Title) > 0
+then
+NewEvent.Start=EventsStart
+NewEvent.End=EventsEnd
+end
 
 for i,import in ipairs(import_urls)
 do
