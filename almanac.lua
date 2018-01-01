@@ -9,7 +9,7 @@ require("time")
 
 --process.lu_set("HTTP:Debug","true")
 
-VERSION="1.4"
+VERSION="1.3"
 ClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
 ClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
 Collated={}
@@ -122,6 +122,9 @@ end
 function ICalParseTime(value, extra)
 local Tokens, str
 local Timezone=""
+
+value=strutil.stripTrailingWhitespace(value);
+value=strutil.stripLeadingWhitespace(value);
 
 Tokens=strutil.TOKENIZER(extra,";")
 str=Tokens:next()
@@ -536,7 +539,7 @@ if date==Tomorrow then str=str.." ~e~yTomorrow~0" end
 print(terminal.format(str))
 if ShowDetail 
 then 
-	print(event.Details) 
+	if strutil.strlen(event.Details) > 0 then print(terminal.format(event.Details)) end
 	print()
 end
 
@@ -574,23 +577,40 @@ end
 
 
 -- called by 'OutputCalendar' to check if an event has been 'hidden' and should not be displayed
-function EventIsHidden(event, HidePatterns) 
-local TOK, pattern
+function EventShow(event, Selections) 
+local TOK, pattern, invert
+local result=false
 
-TOK=strutil.TOKENIZER(HidePatterns,",")
+if strutil.strlen(Selections)==0 then return true end
+
+TOK=strutil.TOKENIZER(Selections,",")
 pattern=TOK:next()
 while pattern ~= nil
 do
-	if strutil.pmatch(pattern, event.Title) > 0 then return true end
+	invert=false
+	if string.sub(pattern, 1, 1) == "!" then 
+		invert=true 
+		pattern=string.sub(pattern, 2)
+	end
+
+	if strutil.pmatch(pattern, event.Title) > 0 
+	then 
+		if invert then result=false
+		else result=true end
+	else
+		if invert then result=true
+		else result=false end
+	end
 	pattern=TOK:next()
 end
-return false
+
+return result
 end
 
 
 
 
-function OutputCalendar(Calendar, HidePatterns)
+function OutputCalendar(Calendar, Selections)
 local i, event
 
 if OutputFormat=="csv" then OutputCSVHeader() 
@@ -599,7 +619,7 @@ end
 
 for i,event in ipairs(Calendar)
 do
-	if event.Start >= EventsStart and ( EventsEnd == 0 or event.Start <= EventsEnd) and EventIsHidden(event, HidePatterns) == false
+	if event.Start >= EventsStart and ( EventsEnd == 0 or event.Start <= EventsEnd) and EventShow(event, Selections) 
 	then
 		if OutputFormat=="csv" then OutputEventCSV(event) 
 		elseif OutputFormat=="ical" then OutputEventICAL(event) 
@@ -657,10 +677,20 @@ print("   -m <n>      show events for the next 'n' weeks. The 'n' argument is op
 print("   -month <n>  show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed")
 print("   -y <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed")
 print("   -year <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed")
+print("   -at <loc>   show events at location 'loc'")
+print("   -where <loc>     show events at location 'loc'")
+print("   -location <loc>  show events at location 'loc'")
+print("   -hide <pattern>  hide events whose title matches fnmatch/shell style pattern 'pattern'")
+print("   -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'")
 print("   -detail     print event description/details")
-print("   -hide <pattern>  hide an event whose title matches fnmatch/shell style pattern 'pattern'")
+print("   -details    print event description/details")
 print("   -old        show events that are in the past")
+print("   -import <url>  Import events from specified URL (usually an ical file) into calendar")
 print("   -of <fmt>   specify format to output. 'csv' will output comma-seperated-values sutitable for reading into a spreadsheet, 'ical' will output ical/ics format, 'txt' will output plain text format, anything else will output text with ANSI color formatting")
+print("   -u         Terminal supports unicode up to code 0x8000")
+print("   -unicode   Terminal supports unicode up to code 0x8000")
+print("   -u2        Terminal supports unicode up to code 0x8000")
+print("   -unicode2  Terminal supports unicode up to code 0x10000")
 print("   -?          This help")
 print("   -h          This help")
 print("   -help       This help")
@@ -680,6 +710,14 @@ end
 
 
 
+function ParseArg(args, i)
+local val
+
+val=args[i]
+args[i]=""
+return val
+
+end
 
 -- Parse a numeric command line argument. This will test if the next argument is numeric, if it is it will be consumed, 
 -- if not then a value of 1 will be returned
@@ -699,35 +737,28 @@ end
 function ParseCommandLine(args)
 local i, v, val
 local calendars=""
-local hide=""
+local selections=""
+local locations=""
 local import_urls={}
 local NewEvent={}
 
 NewEvent.Visibility="default"
 for i,v in ipairs(args)
 do
-if v=="-h" or v=="-hour"       then EventsEnd=Now + 3600 * ParseNumericArg(args,i)
-elseif v=="-d" or v=="-day"       then EventsEnd=Now + 3600 * 24 * ParseNumericArg(args,i)
-elseif v=="-w" or v=="-week"       then EventsEnd=Now + 3600 * 24 * 7 * ParseNumericArg(args,i)
-elseif v=="-m" or v=="-month" then EventsEnd=Now + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
-elseif v=="-y" or v=="-year" then EventsEnd=Now + 3600 * 24 * 365 * ParseNumericArg(args,i)
-elseif v=="-detail" or v=="-v"
-then
-	ShowDetail=true
-elseif v=="-add"
-then
-	NewEvent.Title=args[i+1]
-	args[i+1]=""
-elseif v=="-addpub"
-then
-	NewEvent.Title=args[i+1]
+if v=="-h" or v=="-hour"  then EventsEnd=3600 * ParseNumericArg(args,i)
+elseif v=="-d" or v=="-day" then EventsEnd=3600 * 24 * ParseNumericArg(args,i)
+elseif v=="-w" or v=="-week" then EventsEnd=3600 * 24 * 7 * ParseNumericArg(args,i)
+elseif v=="-m" or v=="-month" then EventsEnd=3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
+elseif v=="-y" or v=="-year" then EventsEnd=3600 * 24 * 365 * ParseNumericArg(args,i)
+elseif v=="-detail" or v=="-details" or v=="-v" then ShowDetail=true
+elseif v=="-add" then NewEvent.Title=ParseArg(args, i+1)
+elseif v=="-addpub" then 
+  NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="public"
-	args[i+1]=""
 elseif v=="-addpriv"
 then
-	NewEvent.Title=args[i+1]
+  NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
-	args[i+1]=""
 elseif v=="-s" or v=="-start"
 then
 	EventsStart=ParseDate(args[i+1])
@@ -736,30 +767,23 @@ elseif v=="-end"
 then
 	EventsEnd=ParseDate(args[i+1])
 	args[i+1]=""
-elseif v=="-at" or v=="-where" or v=="-location"
-then
-	NewEvent.Location=args[i+1]
-	args[i+1]=""
+elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg(args, i+1)
 elseif v=="-import"
 then
 	table.insert(import_urls, args[i+1])
 	args[i+1]=""
 elseif v=="-hide"
 then
-	if strutil.strlen(hide) > 0 
-	then 
-		hide=hide..","..args[i+1] 
-	else
-		hide=args[i+1] 
-	end
-	args[i+1]=""
+	if strutil.strlen(selections) > 0 then selections=selections.. ",!" ..ParseArg(args,i+1) else selections="!"..ParseArg(args, i+1) end
+elseif v=="-show"
+then
+	if strutil.strlen(selections) > 0 then selections=selections..","..ParseArg(args,i+1) else selections=ParseArg(args, i+1) end
 elseif v=="-old"
 then
 	EventsStart=0
-elseif v=="-of"
-then
-	OutputFormat=args[i+1]
-	args[i+1]=""
+elseif v=="-of" then OutputFormat=ParseArg(args, i+1) 
+elseif v=="-u" or v=="-unicode" then  terminal.unicodelvl(1)
+elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
 elseif v=="-?" or v=="-h" or v=="-help" or v=="--help"
 then
 	PrintHelp()
@@ -773,6 +797,8 @@ end
 if strutil.strlen(calendars)==0 then calendars="g:primary" end
 if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
 
+if EventsEnd > 0 then EventsEnd=EventsStart + EventsEnd end
+
 if strutil.strlen(NewEvent.Title) > 0
 then
 NewEvent.Start=EventsStart
@@ -784,14 +810,14 @@ do
 	ImportEventsToCalendar(import, calendars)
 end
 
-return calendars, hide
+return calendars, selections 
 end
 
 
 
 
 --Main starts here
-callist,hides=ParseCommandLine(arg)
+callist,selections=ParseCommandLine(arg)
 
 T=strutil.TOKENIZER(callist,",")
 cal=T:next()
@@ -812,4 +838,4 @@ table.sort(Collated, EventsSort)
 if EventsNewest < Now or #Collated < 2 then EventsStart=0 end
 
 
-OutputCalendar(Collated, hides)
+OutputCalendar(Collated, selections)
