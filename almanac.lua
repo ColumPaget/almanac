@@ -5,6 +5,7 @@ require("strutil")
 require("stream")
 require("dataparser")
 require("terminal")
+require("filesys")
 require("time")
 
 --process.lu_set("HTTP:Debug","true")
@@ -12,7 +13,6 @@ require("time")
 VERSION="1.3"
 ClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
 ClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
-Collated={}
 Now=time.secs()
 ShowDetail=false
 EventsStart=Now
@@ -22,41 +22,62 @@ OutputFormat=""
 Today=time.formatsecs("%Y%m%d",Now);
 Tomorrow=time.formatsecs("%Y%m%d",Now+3600*24);
 
-function EventCreate()
-local Event={}
 
-Event.Attendees=0
-Event.UTCoffset=0;
-Event.Title=""
-Event.Details=""
-Event.Status=""
-Event.Location=""
-Event.Details=""
-Event.Visibility=""
-Event.Start=0
-Event.End=0
 
-return Event
+--GENERIC FUNCTIONS
+
+
+--count digits at start of a string, mostly used by ParseDate 
+function CountDigits(str)
+local i=0
+
+for i=1,strutil.strlen(str),1
+do
+if tonumber(string.sub(str,i,i)) == nil then return i-1 end
+end
+
+return i
 end
 
 
-function OAuthGet(OA)
+--Parse a date from a number of different formats
+function ParseDate(datestr)
+local len
+local str=""
+local when=0
 
-str=strutil.httpQuote("urn:ietf:wg:oauth:2.0:oob");
-OA:set("redirect_uri", str);
-OA:stage1("https://accounts.google.com/o/oauth2/v2/auth");
+len=string.len(datestr)
 
-print()
-print("GOOGLE CALENDAR REQUIRES OAUTH LOGIN. Goto the url below, grant permission, and then copy the resulting code into this app.");
-print()
-print("GOTO: ".. OA:auth_url());
+if len==8
+then
+	str="20"..string.sub(datestr,1,2).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,7,8).."T00:00:00"
+elseif len==10
+then
+	if CountDigits(str) == 4
+	then
+		str=string.sub(datestr,1,4).."-"..string.sub(datestr,6,7).."-"..string.sub(datestr,9,10).."T00:00:00"
+	else
+		str=string.sub(datestr,7,10).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,1,2).."T00:00:00"
+	end
+elseif len==14
+then
+	str="20"..string.sub(datestr,1,2).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,7,8).."T"..string.sub(datestr,10,11)..":"..string.sub(datestr,13,14)
+elseif len==16
+then
+	if CountDigits(str) == 4
+	then
+		str=string.sub(datestr,1,4).."-"..string.sub(datestr,6,7).."-"..string.sub(datestr,9,10).."T"..string.sub(datestr,12,13)..":"..string.sub(datestr, 15, 16)..":00"
+	else
+		str=string.sub(datestr,7,10).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,1,2).."T"..string.sub(datestr,12,13)..":"..string.sub(datestr, 15, 16)..":00"
+	end
+end
 
-OA:listen(8989, "https://www.googleapis.com/oauth2/v4/token");
-OA:save("");
-print()
+when=time.tosecs("%Y-%m-%dT%H:%M:%S", str)
+return when
 end
 
 
+-- Parse a location string, 
 function LocationParse(Event, str)
 local tmpstr=""
 
@@ -76,6 +97,44 @@ end
 
 
 
+-- create a blank event object
+function EventCreate()
+local Event={}
+
+Event.Attendees=0
+Event.UTCoffset=0;
+Event.Title=""
+Event.Details=""
+Event.Status=""
+Event.Location=""
+Event.Details=""
+Event.Visibility=""
+Event.Start=0
+Event.End=0
+
+return Event
+end
+
+
+-- do initial oauth authentication
+function OAuthGet(OA)
+
+str=strutil.httpQuote("urn:ietf:wg:oauth:2.0:oob");
+OA:set("redirect_uri", str);
+OA:stage1("https://accounts.google.com/o/oauth2/v2/auth");
+
+print()
+print("GOOGLE CALENDAR REQUIRES OAUTH LOGIN. Goto the url below, grant permission, and then copy the resulting code into this app.");
+print()
+print("GOTO: ".. OA:auth_url());
+
+OA:listen(8989, "https://www.googleapis.com/oauth2/v4/token");
+OA:save("");
+print()
+end
+
+
+-- FUNCTIONS FOR PARSING ICAL FILES
 function ICalReadLine(S)
 local Tokens, tok, line, key, extra 
 
@@ -193,6 +252,8 @@ end
 
 
 
+-- FUNCTIONS FOR PARSING RSS FILES
+
 function RSSParseEvent(Parser)
 local Event
 
@@ -243,28 +304,8 @@ end
 
 
 
-function DocumentLoadEvents(Events, url)
-local S, doctype, Tokens
-S=stream.STREAM(url, "r");
-if S ~= nil
-then
-	Tokens=strutil.TOKENIZER(S:getvalue("HTTP:Content-Type"), ";")
-	doctype=Tokens:next()
-	if doctype ~= nil then print("doctype: ".. doctype) end
-	if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml" 
-	then 
-		RSSLoadEvents(Events, S)
-	else
-		ICalLoadEvents(Events, S)
-	end
-else
-print(terminal.format("~rerror: cannot open '"..url.."'~0"))
-end
 
-end
-
-
-
+-- FUNCTIONS RELATING TO GOOGLE CALENDAR
 function GCalAddEvent(calendars, NewEvent)
 local url, S, text, doc, cal, Tokens
 
@@ -363,6 +404,7 @@ end
 
 
 
+-- FUNCTIONS RELATING TO MEETUP CALENDARS
 function MeetupParseEvent(Parser)
 local Event={}
 
@@ -412,6 +454,75 @@ end
 S:close()
 end
 
+--FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
+
+function AlmanacLoadCalendar(Collated, cal)
+local S, str, event, toks
+
+str=process.getenv("HOME") .. time.format("/.almanac/%b-%Y.cal")
+S=stream.STREAM(str)
+if S ~= nil
+then
+str=S:readln()
+while str ~= nil
+do
+print("LD: "..str)
+event=EventCreate()
+toks=strutil.TOKENIZER(str, "\\S", "Q")
+event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.Title=toks:next()
+event.Location=toks:next()
+table.insert(Collated, event)
+str=S:readln()
+end
+S:close()
+end
+
+end
+
+
+function AlmanacAddEvent(event)
+local S, str
+
+str=process.getenv("HOME") .. "/.almanac/"
+filesys.mkdir(str)
+
+str=str..time.formatsecs("%b-%Y.cal", event.Start)
+S=stream.STREAM(str, "a")
+if S ~= nil
+then
+str=time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
+str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
+str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" "
+S:writeln(str.."\n")
+S:close()
+end
+
+end
+
+
+function DocumentLoadEvents(Events, url)
+local S, doctype, Tokens
+S=stream.STREAM(url, "r");
+if S ~= nil
+then
+	Tokens=strutil.TOKENIZER(S:getvalue("HTTP:Content-Type"), ";")
+	doctype=Tokens:next()
+	if doctype ~= nil then print("doctype: ".. doctype) end
+	if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml" 
+	then 
+		RSSLoadEvents(Events, S)
+	else
+		ICalLoadEvents(Events, S)
+	end
+else
+print(terminal.format("~rerror: cannot open '"..url.."'~0"))
+end
+
+end
+
+
 function ImportEventsToCalendar(url, calendars)
 local Events={}
 
@@ -419,57 +530,12 @@ DocumentLoadEvents(Events, url)
 for i,event in ipairs(Events)
 do
 GCalAddEvent(calendars, event)
+AlmanacAddEvent(event)
 end
 end
 
 
-function CountDigits(str)
-local i=0
 
-for i=1,strutil.strlen(str),1
-do
-if tonumber(string.sub(str,i,i)) == nil then return i-1 end
-end
-
-return i
-end
-
-
-function ParseDate(str)
-local len
-local tmpstr=""
-local when=0
-
-
-len=string.len(str)
-
-if len==8
-then
-	tmpstr="20"..string.sub(str,1,2).."-"..string.sub(str,4,5).."-"..string.sub(str,7,8).."T00:00:00"
-elseif len==10
-then
-	if CountDigits(str) == 4
-	then
-		tmpstr=string.sub(str,1,4).."-"..string.sub(str,6,7).."-"..string.sub(str,9,10).."T00:00:00"
-	else
-		tmpstr=string.sub(str,7,10).."-"..string.sub(str,4,5).."-"..string.sub(str,1,2).."T00:00:00"
-	end
-elseif len==14
-then
-	tmpstr="20"..string.sub(str,1,2).."-"..string.sub(str,4,5).."-"..string.sub(str,7,8).."T"..string.sub(str,10,11)..":"..string.sub(str,13,14)
-elseif len==16
-then
-	if CountDigits(str) == 4
-	then
-		tmpstr=string.sub(str,1,4).."-"..string.sub(str,6,7).."-"..string.sub(str,9,10).."T"..string.sub(str,12,13)..":"..string.sub(str, 15, 16)..":00"
-	else
-		tmpstr=string.sub(str,7,10).."-"..string.sub(str,4,5).."-"..string.sub(str,1,2).."T"..string.sub(str,12,13)..":"..string.sub(str, 15, 16)..":00"
-	end
-end
-
-when=time.tosecs("%Y-%m-%dT%H:%M:%S", tmpstr)
-return when
-end
 
 function OutputICALHeader()
 print("BEGIN:VCALENDAR")
@@ -649,6 +715,37 @@ return false
 end
 
 
+function DisplayCalendarEvents(calendars, selections)
+local T, cal
+local Collated={}
+
+T=strutil.TOKENIZER(calendars,",")
+cal=T:next()
+while cal ~= nil
+do
+if string.len(cal) > 0
+then
+	if string.sub(cal,1, 2) == "a:" then AlmanacLoadCalendar(Collated, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Collated, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Collated, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Collated, "http://" .. string.sub(cal, 8))
+	else DocumentLoadEvents(Collated, cal)
+	end
+end
+cal=T:next()
+end
+
+if #Collated > 0
+then
+	table.sort(Collated, EventsSort)
+	if EventsNewest < Now or #Collated < 2 then EventsStart=0 end
+
+	OutputCalendar(Collated, selections)
+else
+	print("No Events found to display")
+end
+end
+
 
 function PrintHelp()
 print("almanac - version: "..VERSION)
@@ -733,9 +830,12 @@ local val
 	return val
 end
 
+
+
 -- Parse command line arguments. The 'add event' functionality is called directly from with this function if -add is encounted on the command line
 function ParseCommandLine(args)
 local i, v, val
+local action="none"
 local calendars=""
 local selections=""
 local locations=""
@@ -751,12 +851,18 @@ elseif v=="-w" or v=="-week" then EventsEnd=3600 * 24 * 7 * ParseNumericArg(args
 elseif v=="-m" or v=="-month" then EventsEnd=3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
 elseif v=="-y" or v=="-year" then EventsEnd=3600 * 24 * 365 * ParseNumericArg(args,i)
 elseif v=="-detail" or v=="-details" or v=="-v" then ShowDetail=true
-elseif v=="-add" then NewEvent.Title=ParseArg(args, i+1)
-elseif v=="-addpub" then 
+elseif v=="-add" 
+then 
+		action="add"
+		NewEvent.Title=ParseArg(args, i+1)
+elseif v=="-addpub" 
+then 
+	action="add"
   NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="public"
 elseif v=="-addpriv"
 then
+	action="add"
   NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
 elseif v=="-s" or v=="-start"
@@ -770,6 +876,7 @@ then
 elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg(args, i+1)
 elseif v=="-import"
 then
+	action="import"
 	table.insert(import_urls, args[i+1])
 	args[i+1]=""
 elseif v=="-hide"
@@ -786,7 +893,7 @@ elseif v=="-u" or v=="-unicode" then  terminal.unicodelvl(1)
 elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
 elseif v=="-?" or v=="-h" or v=="-help" or v=="--help"
 then
-	PrintHelp()
+	action="help"
 	os.exit() --othewise we will print default calendar
 else
 	if strutil.strlen(v) then calendars=calendars..","..v end
@@ -795,47 +902,40 @@ end
 end
 
 if strutil.strlen(calendars)==0 then calendars="g:primary" end
-if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
-
-if EventsEnd > 0 then EventsEnd=EventsStart + EventsEnd end
 
 if strutil.strlen(NewEvent.Title) > 0
 then
-NewEvent.Start=EventsStart
-NewEvent.End=EventsEnd
+	NewEvent.Start=EventsStart
+	if EventsEnd > 0 
+	then 
+		NewEvent.End=EventsEnd
+	else
+		NewEvent.End=EventsStart
+	end
 end
+
 
 for i,import in ipairs(import_urls)
 do
 	ImportEventsToCalendar(import, calendars)
 end
 
-return calendars, selections 
+return action, NewEvent, calendars, selections 
 end
 
 
 
 
 --Main starts here
-callist,selections=ParseCommandLine(arg)
+action,event,calendars,selections=ParseCommandLine(arg)
 
-T=strutil.TOKENIZER(callist,",")
-cal=T:next()
-while cal ~= nil
-do
-if string.len(cal) > 0
+if action=="help"
 then
-	if string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Collated, string.sub(cal, 3)) 
-	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Collated, string.sub(cal, 3)) 
-	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Collated, "http://" .. string.sub(cal, 8))
-	else DocumentLoadEvents(Collated, cal)
-	end
+	PrintHelp()
+elseif action=="add"
+then
+	AlmanacAddEvent(event)
+	--if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
+else
+	DisplayCalendarEvents(calendars, selections)
 end
-cal=T:next()
-end
-
-table.sort(Collated, EventsSort)
-if EventsNewest < Now or #Collated < 2 then EventsStart=0 end
-
-
-OutputCalendar(Collated, selections)
