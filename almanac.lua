@@ -19,13 +19,35 @@ EventsStart=Now
 EventsEnd=0
 EventsNewest=0
 OutputFormat=""
-Today=time.formatsecs("%Y%m%d",Now);
-Tomorrow=time.formatsecs("%Y%m%d",Now+3600*24);
-
+Today=time.formatsecs("%Y%m%d", Now)
+Tomorrow=time.formatsecs("%Y%m%d", Now+3600*24)
+Persist=false
 
 
 --GENERIC FUNCTIONS
 
+
+--this function builds a single line from file formats (email headers and ical) that set limits on line length.
+--these formats split long lines and start the continuation lines with a whitespace to indicate it's a
+--continuation of the previousline
+function UnSplitLine(lines)
+local line, tok, char1
+
+line=lines:next()
+tok=lines:peek()
+
+while line ~= nil and tok ~= nil
+do
+	char1=string.sub(tok, 1, 1)
+	if char1 ~= " " and char1 ~= "  " then break end
+
+	--now really read the peeked token
+	line=line .. lines:next()
+	tok=lines:peek()
+end
+
+return line
+end
 
 --count digits at start of a string, mostly used by ParseDate 
 function CountDigits(str)
@@ -135,48 +157,44 @@ end
 
 
 -- FUNCTIONS FOR PARSING ICAL FILES
-function ICalReadLine(S)
-local Tokens, tok, line, key, extra 
+function ICalNextLine(lines)
+local toks, tok, key, extra, line
 
-line=strutil.stripCRLF(S:readln())
-if line == nil then return nil end
-while S:peekch()==" "
-do
-S:readch()
-line=line..strutil.stripCRLF(S:readln())
-end
+line=UnSplitLine(lines)
+if line==nil then return nil end
 
-Tokens=strutil.TOKENIZER(strutil.stripTrailingWhitespace(line),":|;","ms")
-key=Tokens:next()
-tok=Tokens:next()
+line=strutil.stripTrailingWhitespace(line);
+toks=strutil.TOKENIZER(strutil.stripTrailingWhitespace(line),":|;","ms")
+key=toks:next()
+tok=toks:next()
 while tok==";"
 do
-	tok=Tokens:next()
+	tok=toks:next()
 	if strutil.strlen(extra) > 0 
 	then 
 		extra=extra..";"..tok
 	else 
 		extra=tok
 	end
-
-	tok=Tokens:next()
+	tok=toks:next()
 end
 
-return key, Tokens:remaining(), extra
+return key, toks:remaining(), extra
 end
 
 
-function ICalReadPastSubItem(S, itemtype)
+function ICalReadPastSubItem(lines, itemtype)
 local key, value, extra, tmpstr
 
-key,value,extra=ICalReadLine(S)
+key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
 	if key=="END" and value==itemtype then break end
-	key,value,extra=ICalReadLine(S)
+	key,value,extra=ICalNextLine(lines)
 end
 
 end
+
 
 function ICalParseTime(value, extra)
 local Tokens, str
@@ -198,17 +216,16 @@ end
 
 
 
-
-function ICalParseEvent(S)
+function ICalParseEvent(lines, Events)
 local key, value, extra, tmpstr
 local Event
 
 Event=EventCreate()
-key,value,extra=ICalReadLine(S)
+key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
 	if key=="END" and value=="VEVENT" then break end
-	if key=="BEGIN" then ICalReadPastSubItem(S, value) end
+	if key=="BEGIN" then ICalReadPastSubItem(lines, value) end
 	if key=="SUMMARY" then 
 		tmpstr=string.gsub(strutil.unQuote(value),"\n"," ")
 		Event.Title=strutil.stripCRLF(tmpstr)
@@ -224,31 +241,27 @@ do
 	if key=="DTEND" then Event.End=ICalParseTime(value, extra) end
 	if key=="ATTENDEE" then Event.Attendees=Event.Attendees+1 end
 
-	key,value,extra=ICalReadLine(S)
+	key,value,extra=ICalNextLine(lines)
 end
 
-return Event
+table.insert(Events, Event)
 end
 
 
-function ICalLoadEvents(Events, S)
-local line, Tokens, key, value, extra
+function ICalLoadEvents(Events, doc)
+local line, str, char1, lines
 
-key,value,extra=ICalReadLine(S)
+lines=strutil.TOKENIZER(doc, "\n")
+key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
-if value ~= nil
-then
-	if key=="BEGIN" and value=="VEVENT" 
-	then 
-		table.insert(Events, ICalParseEvent(S))
-	end
-end
-
-key,value,extra=ICalReadLine(S)
+	if key=="BEGIN" and value=="VEVENT" then ICalParseEvent(lines, Events) end
+	key,value,extra=ICalNextLine(lines)
 end
 
 end
+
+
 
 
 
@@ -466,7 +479,6 @@ then
 str=S:readln()
 while str ~= nil
 do
-print("LD: "..str)
 event=EventCreate()
 toks=strutil.TOKENIZER(str, "\\S", "Q")
 event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
@@ -502,19 +514,42 @@ end
 end
 
 
+function DocumentGetType(S)
+local Tokens, str, ext
+local doctype=""
+
+str=S:getvalue("HTTP:Content-Type")
+if strutil.strlen(str) ~= 0
+then
+	Tokens=strutil.TOKENIZER(str, ";")
+	doctype=Tokens:next()
+else
+	str=S:path()
+	if strutil.strlen(str) ~= nil
+	then
+		ext=filesys.extn(str)
+		if ext==".ical" then doctype="application/ical" 
+		elseif ext==".rss" then doctype="application/rss" 
+		end
+	end
+end
+
+return doctype
+end 
+
+
+
 function DocumentLoadEvents(Events, url)
-local S, doctype, Tokens
+local S, doctype
 S=stream.STREAM(url, "r");
 if S ~= nil
 then
-	Tokens=strutil.TOKENIZER(S:getvalue("HTTP:Content-Type"), ";")
-	doctype=Tokens:next()
-	if doctype ~= nil then print("doctype: ".. doctype) end
+	doctype=DocumentGetType(S)
 	if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml" 
 	then 
 		RSSLoadEvents(Events, S)
 	else
-		ICalLoadEvents(Events, S)
+		ICalLoadEvents(Events, S:readdoc())
 	end
 else
 print(terminal.format("~rerror: cannot open '"..url.."'~0"))
@@ -534,6 +569,149 @@ AlmanacAddEvent(event)
 end
 end
 
+
+
+-- Functions related to extracting ical and other files from emails
+function EmailExtractBoundary(header)
+local toks, str
+local boundary=""
+
+
+toks=strutil.TOKENIZER(header, "\\S")
+str=toks:next()
+while str~= nil
+do
+if string.sub(str, 1,9) == "boundary=" then boundary=strutil.stripQuotes(string.sub(str, 10)) end
+str=toks:next()
+end
+
+return boundary
+end
+
+function EmailHandleContentType(content_type, args)
+local boundary=""
+
+if string.sub(content_type, 1, 10)== "multipart/" then boundary=EmailExtractBoundary(args) end
+
+return content_type, boundary
+end
+
+
+function EmailParseHeader(header, mime_info)
+local toks
+local name=""
+local value=""
+local args=""
+
+toks=strutil.TOKENIZER(header, ":|;", "m")
+name=toks:next()
+value=toks:next()
+if name ~= nil  and value ~= nil
+then
+	name=string.lower(name)
+	value=string.lower(strutil.stripLeadingWhitespace(value))
+	args=toks:remaining()
+
+	if name=="content-type" 
+	then 
+	mime_info.content_type,mime_info.boundary=EmailHandleContentType(value, args) 
+	elseif name=="content-transfer-encoding"
+	then
+	mime_info.encoding=value
+	end
+end
+
+end
+
+
+
+function EmailReadHeaders(S)
+local line, str
+local header=""
+local mime_info={}
+
+mime_info.content_type=""
+mime_info.boundary=""
+mime_info.encoding=""
+
+line=S:readln()
+while line ~= nil
+do
+	line=strutil.stripTrailingWhitespace(line);
+	char1=string.sub(line, 1, 1)
+
+	if char1 ~= " " and char1 ~= "	"
+	then
+		EmailParseHeader(header, mime_info)
+		header=""
+	end
+	header=header .. line
+	if strutil.strlen(line) < 1 then break end
+	line=S:readln()
+end
+
+EmailParseHeader(header, mime_info)
+
+return mime_info
+end
+
+
+function EmailReadDocument(S, boundary, encoding)
+local line, event, i
+local doc=""
+local Events={}
+
+line=S:readln()
+while line ~= nil
+do
+	if encoding=="base64" 
+	then 
+	doc=doc..strutil.decode(line, "base64") 
+	else
+	doc=doc..line
+	end
+line=S:readln()
+end
+
+ICalLoadEvents(Events, doc)
+for i,event in ipairs(Events)
+do
+	AlmanacAddEvent(event)
+end
+
+end
+
+function EmailHandleMimeItem(S, boundary)
+local mime_info
+
+mime_info=EmailReadHeaders(S)
+print("ct: ".. mime_info.content_type.. " enc: ".. mime_info.encoding)
+
+if mime_info.content_type == "text/calendar"
+then
+	EmailReadDocument(S, mime_info.boundary, mime_info.encoding)
+end
+
+end
+
+
+
+function EmailImportCalendarItems(path)
+local S, mime_info, boundary, str
+
+S=stream.STREAM(path, "r")
+mime_info=EmailReadHeaders(S)
+
+boundary="--" .. mime_info.boundary
+str=S:readln()
+while str ~= nil
+do
+	str=strutil.stripTrailingWhitespace(str)
+	if str==boundary then EmailHandleMimeItem(S, boundary) end
+	str=S:readln()
+end
+
+end
 
 
 
@@ -768,6 +946,7 @@ print("   -h <n>      show events for the next 'n' hours. The 'n' argument is op
 print("   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -d <n>      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -day  <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -days <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
 print("   -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
 print("   -m <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed")
@@ -843,13 +1022,25 @@ local import_urls={}
 local NewEvent={}
 
 NewEvent.Visibility="default"
+
 for i,v in ipairs(args)
 do
-if v=="-h" or v=="-hour"  then EventsEnd=3600 * ParseNumericArg(args,i)
-elseif v=="-d" or v=="-day" then EventsEnd=3600 * 24 * ParseNumericArg(args,i)
-elseif v=="-w" or v=="-week" then EventsEnd=3600 * 24 * 7 * ParseNumericArg(args,i)
-elseif v=="-m" or v=="-month" then EventsEnd=3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
-elseif v=="-y" or v=="-year" then EventsEnd=3600 * 24 * 365 * ParseNumericArg(args,i)
+if v=="-s" or v=="-start"
+then
+	EventsStart=ParseDate(args[i+1])
+	args[i+1]=""
+end
+end
+
+if EventsStart==0 then EventStart=time.now() end
+
+for i,v in ipairs(args)
+do
+if v=="-h" or v=="-hour"  then EventsEnd=EventsStart + 3600 * ParseNumericArg(args,i)
+elseif v=="-d" or v=="-day" or v=="-days" then EventsEnd=EventsStart + 3600 * 24 * ParseNumericArg(args,i)
+elseif v=="-w" or v=="-week" then EventsEnd=EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
+elseif v=="-m" or v=="-month" then EventsEnd=EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
+elseif v=="-y" or v=="-year" then EventsEnd=EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
 elseif v=="-detail" or v=="-details" or v=="-v" then ShowDetail=true
 elseif v=="-add" 
 then 
@@ -865,10 +1056,6 @@ then
 	action="add"
   NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
-elseif v=="-s" or v=="-start"
-then
-	EventsStart=ParseDate(args[i+1])
-	args[i+1]=""
 elseif v=="-end"
 then
 	EventsEnd=ParseDate(args[i+1])
@@ -877,6 +1064,11 @@ elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg
 elseif v=="-import"
 then
 	action="import"
+	table.insert(import_urls, args[i+1])
+	args[i+1]=""
+elseif v=="-email"
+then
+	action="import-email"
 	table.insert(import_urls, args[i+1])
 	args[i+1]=""
 elseif v=="-hide"
@@ -888,6 +1080,7 @@ then
 elseif v=="-old"
 then
 	EventsStart=0
+elseif v=="-persist" then Persist=true 
 elseif v=="-of" then OutputFormat=ParseArg(args, i+1) 
 elseif v=="-u" or v=="-unicode" then  terminal.unicodelvl(1)
 elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
@@ -901,7 +1094,7 @@ end
 
 end
 
-if strutil.strlen(calendars)==0 then calendars="g:primary" end
+if strutil.strlen(calendars)==0 then calendars="a:default" end
 
 if strutil.strlen(NewEvent.Title) > 0
 then
@@ -917,7 +1110,12 @@ end
 
 for i,import in ipairs(import_urls)
 do
+	if action=="import-email"
+	then
+	EmailImportCalendarItems(import)
+	else
 	ImportEventsToCalendar(import, calendars)
+	end
 end
 
 return action, NewEvent, calendars, selections 
@@ -936,6 +1134,13 @@ elseif action=="add"
 then
 	AlmanacAddEvent(event)
 	--if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
+elseif Persist==true
+then
+	while true
+	do
+	DisplayCalendarEvents(calendars, selections)
+	process.sleep(100)
+	end
 else
 	DisplayCalendarEvents(calendars, selections)
 end
