@@ -56,35 +56,57 @@ If you find any other public calendars that people might be interested in, you c
 
 ## Usage
 ```
-almanac [options] [calendar]...
+usage:  almanac [options] [calendar]...
 
+almanac can pull calendar feeds from webcalendars using the google calendar api, meetup api, ical format, or xcal rss format
 google and meetup calendars are identified in the following format:
 g:calendar@hackercons.org          - a google calendar
 m:fizzPOP-Birminghams-Makerspace   - a meetup calendar
-the users default google calendar can be specified as 'g:primary' 
+
+The default calendar is stored on disk, and is referred to as 'a:default',  and if no calendar is supplied then it will be displayed by default
 ical and rss webcalendars are identified by a url as normal.
-Currently only .ical or .ics files can be loaded from disk.
-Events can also be uploaded to google calendars that the user has permission for.
+Events can also be uploaded to google calendars that the user has permission for. If pushing events to a user's google calendar, or displaying events from it, this can be specified as 'g:primary'
 
 options:
+   -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
+   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
    -d <n>      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
    -day  <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
+   -days <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
    -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
    -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
    -m <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
    -month <n>  show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
    -y <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
    -year <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
+   -at <loc>   show events at location 'loc'
+   -where <loc>     show events at location 'loc'
+   -location <loc>  show events at location 'loc'
+   -hide <pattern>  hide events whose title matches fnmatch/shell style pattern 'pattern'
+   -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'
    -detail     print event description/details
-   -hide <pattern>  hide an event whose title matches fnmatch/shell style pattern 'pattern'
+   -details    print event description/details
    -old        show events that are in the past
+   -import <url>  Import events from specified URL (usually an ical file) into calendar
+   -import-email <url>  Import events from ical attachments within an email file at the specified URL into calendar
+   -persist    don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.
+   -lfmt <format string>          line format for ansi output (see 'display formats' for details of title strings)
+   -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
+   -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
+   -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -of <fmt>   specify format to output. 'csv' will output comma-seperated-values sutitable for reading into a spreadsheet, 'ical' will output ical/ics format, 'txt' will output plain text format, anything else will output text with ANSI color formatting
+   -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
+   -u         Terminal supports unicode up to code 0x8000
+   -unicode   Terminal supports unicode up to code 0x8000
+   -u2        Terminal supports unicode up to code 0x8000
+   -unicode2  Terminal supports unicode up to code 0x10000
    -?          This help
    -h          This help
    -help       This help
    --help      This help
 
-The following options all relate to inserting an event into a google calendar. if no google calendar is specified then the users primary calendar (g:primary) is assumed
+ADD EVENTS
+The following options all relate to inserting an event into an almanac or a google calendar. if calendar is specified then the default almanac calendar (a:default) is assumed. You can instead use the user's primary google calendar by specifiying 'g:primary'
    -add <title>           add an event with specified title using the destination calendars default privacy setting
    -addpub <title>        add a public event with specified title
    -addpriv <title>       add a private event with specified title
@@ -94,6 +116,36 @@ The following options all relate to inserting an event into a google calendar. i
    -where <location>      location of event
    -location <location>   location of event
    -import <path>         import events from a .ical/.ics file and upload them to a calendar
+
+example: almanac.lua -add "dental appointment" -start "2020/01/23"
+
+DISPLAY FORMATS
+In the default mode, ansi display mode, you can specify the line-by-line output format by using a combination of color identifiers and data identifiers.
+data identifiers: these are strings that will be replaced by the specified value
+$(title)        event title/summary
+$(date)         start date in Y/m/d format
+$(time)         start time in H:M:S format
+$(day)          numeric day of month
+$(month)        numeric month of year
+$(Year)         year in 4-digit format
+$(year)         year in 2-digit format
+$(monthname)    name of month
+$(dayname)      name of day (Mon, Tue, Wed...)
+$(dayid)        like dayname, except including 'today' and 'tomorrow'
+$(dayid_color)  like dayid, but today will be in ansi red, tomorrow in ansi yellow
+$(location)     event location
+$(duration)     event duration
+
+color identifiers: format strings that specifier colors
+~0      reset colors
+~r      red
+~g      green
+~b      blue
+~y      yellow
+~m      magenta
+~c      cyan
+~w      white
+~n      noir (black)
+~e      bold (emphasis)
+default display format is:  ~c$(dayid_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)
 ```
-
-
