@@ -109,7 +109,7 @@ options:
    --help      This help
 ```
 
-ADD EVENTS
+## ADD EVENTS
 The following options all relate to inserting an event into an almanac or a google calendar. if calendar is specified then the default almanac calendar (a:default) is assumed. You can instead use the user's primary google calendar by specifiying 'g:primary'
 ```
    -add <title>           add an event with specified title using the destination calendars default privacy setting
@@ -125,7 +125,7 @@ The following options all relate to inserting an event into an almanac or a goog
 
 example: almanac.lua -add "dental appointment" -start "2020/01/23"
 
-OUTPUT FORMATS
+## OUTPUT FORMATS
 the '-of' option can specify one of the following output formats:
 ```
 csv     output comma-seperated-values suitable for reading into a spreadsheet.
@@ -135,7 +135,7 @@ sgical  output file format sutable for Sanjay Ghemawat's unix ical application.
 ansi    output text with ANSI color formatting
 ```
 
-DISPLAY FORMATS
+## DISPLAY FORMATS
 In the default mode, ansi display mode, you can specify the line-by-line output format by using a combination of color identifiers and data identifiers.
 data identifiers: these are strings that will be replaced by the specified value
 ```
@@ -170,7 +170,7 @@ color identifiers: format strings that specifier colors
 
 default display format is:  `~c$(dayid_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)`
 
-EXAMPLES
+## EXAMPLES
 
 display default calendar
 ```
