@@ -3,7 +3,7 @@
 author: Colum Paget (colums.projects@gmail.com)  
 licence: GPLv3  
 
-Almanac is a calendar app that can download events from google calendars, meetup.com calendars, rss feeds with xCal extensions and iCal/ics feeds. It can also insert events into a google calendar.
+Almanac is a calendar app that can store events in a local calendar, and display them as a simple list of events. It can download events from google calendars, meetup.com calendars, rss feeds with xCal extensions and iCal/ics feeds, and display these or add them to the local calendar. It can also insert events into a google calendar. It can output events in a number of formats, including csv, ical and 'sgical' which is the file format of Sanjay Ghemawat's 'ical' application.
 
 To use almanac you will need to have the following installed:
 
@@ -55,8 +55,10 @@ http://icalshare.com/
 If you find any other public calendars that people might be interested in, you can email them to me at 'colums.projects@gmail.com' and I'll add them to this list
 
 ## Usage
+
 ```
-usage:  almanac [options] [calendar]...
+ almanac [options] [calendar]...
+```
 
 almanac can pull calendar feeds from webcalendars using the google calendar api, meetup api, ical format, or xcal rss format
 google and meetup calendars are identified in the following format:
@@ -67,6 +69,7 @@ The default calendar is stored on disk, and is referred to as 'a:default',  and 
 ical and rss webcalendars are identified by a url as normal.
 Events can also be uploaded to google calendars that the user has permission for. If pushing events to a user's google calendar, or displaying events from it, this can be specified as 'g:primary'
 
+```
 options:
    -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
    -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
@@ -94,7 +97,7 @@ options:
    -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
-   -of <fmt>   specify format to output. 'csv' will output comma-seperated-values sutitable for reading into a spreadsheet, 'ical' will output ical/ics format, 'txt' will output plain text format, anything else will output text with ANSI color formatting
+   -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
    -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -u         Terminal supports unicode up to code 0x8000
    -unicode   Terminal supports unicode up to code 0x8000
@@ -104,9 +107,11 @@ options:
    -h          This help
    -help       This help
    --help      This help
+```
 
 ADD EVENTS
 The following options all relate to inserting an event into an almanac or a google calendar. if calendar is specified then the default almanac calendar (a:default) is assumed. You can instead use the user's primary google calendar by specifiying 'g:primary'
+```
    -add <title>           add an event with specified title using the destination calendars default privacy setting
    -addpub <title>        add a public event with specified title
    -addpriv <title>       add a private event with specified title
@@ -116,12 +121,24 @@ The following options all relate to inserting an event into an almanac or a goog
    -where <location>      location of event
    -location <location>   location of event
    -import <path>         import events from a .ical/.ics file and upload them to a calendar
+```
 
 example: almanac.lua -add "dental appointment" -start "2020/01/23"
+
+OUTPUT FORMATS
+the '-of' option can specify one of the following output formats:
+```
+csv     output comma-seperated-values suitable for reading into a spreadsheet.
+txt     output plain text format.
+ical    output ical/ics format.
+sgical  output file format sutable for Sanjay Ghemawat's unix ical application.
+ansi    output text with ANSI color formatting
+```
 
 DISPLAY FORMATS
 In the default mode, ansi display mode, you can specify the line-by-line output format by using a combination of color identifiers and data identifiers.
 data identifiers: these are strings that will be replaced by the specified value
+```
 $(title)        event title/summary
 $(date)         start date in Y/m/d format
 $(time)         start time in H:M:S format
@@ -135,8 +152,10 @@ $(dayid)        like dayname, except including 'today' and 'tomorrow'
 $(dayid_color)  like dayid, but today will be in ansi red, tomorrow in ansi yellow
 $(location)     event location
 $(duration)     event duration
+```
 
 color identifiers: format strings that specifier colors
+```
 ~0      reset colors
 ~r      red
 ~g      green
@@ -147,5 +166,55 @@ color identifiers: format strings that specifier colors
 ~w      white
 ~n      noir (black)
 ~e      bold (emphasis)
-default display format is:  ~c$(dayid_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)
+```
+
+default display format is:  `~c$(dayid_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)`
+
+EXAMPLES
+
+display default calendar
+```
+	almanac.lua a:default
+```
+
+display user's primary google calendar
+```
+	almanac.lua g:primary
+```
+
+display web calendar
+```
+	almanac.lua https://launchlibrary.net/1.3/calendar/next/100
+```
+
+output web calendar in format suitable for Sanjay Ghemawat's 'ical' program, and redirect to a file that ical can import
+```
+	almanac.lua -of sgical https://launchlibrary.net/1.3/calendar/next/100 > launches.calendar
+```
+
+output web calendar in CSV format suitable spreadsheet import
+```
+	almanac.lua -of csv https://launchlibrary.net/1.3/calendar/next/100 > launches.csv
+```
+
+add event to almanac calendar
+```
+	almanac.lua -add "dental appointment" -start "2020/01/23"
+	almanac.lua a:default -add "dental appointment" -start "2020/01/23"
+```
+
+add event to google calendar
+```
+	almanac.lua g:primary -add "dental appointment" -start "2020/01/23"
+	almanac.lua g:me@mydomain.org -add "next meeting" -start "2020/01/23"
+```
+
+import an ical url into local calendar
+```
+	almanac.lua a:default -import https://launchlibrary.net/1.3/calendar/next/100
+```
+
+import all ical attachments in an email file into local calendar
+```
+	almanac.lua a:default -import-email mailfile.mail
 ```
