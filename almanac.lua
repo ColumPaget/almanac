@@ -24,8 +24,8 @@ Tomorrow=""
 
 function UpdateTimes()
 Now=time.secs()
-Today=time.formatsecs("%Y%m%d", Now)
-Tomorrow=time.formatsecs("%Y%m%d", Now+3600*24)
+Today=time.formatsecs("%Y/%m/%d", Now)
+Tomorrow=time.formatsecs("%Y/%m/%d", Now+3600*24)
 end
 
 
@@ -47,8 +47,10 @@ values["day"]=time.formatsecs("%d", event.Start)
 values["month"]=time.formatsecs("%m", event.Start)
 values["Year"]=time.formatsecs("%Y", event.Start)
 values["year"]=time.formatsecs("%y", event.Start)
-values["dayname"]=time.formatsecs("%a", event.Start)
-values["monthname"]=time.formatsecs("%b", event.Start)
+values["dayname"]=time.formatsecs("%A", event.Start)
+values["daynick"]=time.formatsecs("%a", event.Start)
+values["monthname"]=time.formatsecs("%B", event.Start)
+values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
 
@@ -56,22 +58,29 @@ if values["date"]==Today
 then 
 	values["dayid"]="Today"
 	values["dayid_color"]="~r~eToday~0"
+	values["daynick_color"]=time.formatsecs("~r~e%a~0", event.Start)
 elseif values["date"]==Tomorrow
 then 
 	values["dayid"]="Tomorrow"
 	values["dayid_color"]="~y~eTomorrow~0"
+	values["daynick_color"]=time.formatsecs("~y~e%a~0", event.Start)
 elseif event.Start < Now
 then
-	values["dayid"]=time.formatsecs("%a", event.Start)
-	values["dayid_color"]=time.formatsecs("~r%a~0", event.Start)
+	values["dayid"]=time.formatsecs("%A", event.Start)
+	values["dayid_color"]=time.formatsecs("~R~n%a~0", event.Start)
+	values["daynick_color"]=time.formatsecs("~R~n%a~0", event.Start)
 else
-	values["dayid"]=time.formatsecs("%a", event.Start)
+	values["dayid"]=time.formatsecs("%A", event.Start)
 	values["dayid_color"]=time.formatsecs("%a", event.Start)
+	values["daynick_color"]=time.formatsecs("%a", event.Start)
 end
 
 
 diff=event.Start - Now
-if diff < 0 then str="~r"
+if diff < 0 then str="~R~b"
+elseif diff < (10 * 60)  then str="~r"
+elseif diff < (30 * 60) then str="~m"
+elseif diff < (60 * 60) then str="~g"
 else str=""
 end
 
@@ -1170,6 +1179,7 @@ print("   -xt <title string>             when -persist is used, also set the xte
 print("   -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
 print("   -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
 print("   -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details")
+print("   -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.")
 print("   -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.")
 print("   -u         Terminal supports unicode up to code 0x8000")
 print("   -unicode   Terminal supports unicode up to code 0x8000")
@@ -1205,19 +1215,22 @@ print()
 print("DISPLAY FORMATS")
 print("In the default mode, ansi display mode, you can specify the line-by-line output format by using a combination of color identifiers and data identifiers.")
 print("data identifiers: these are strings that will be replaced by the specified value")
-print("$(title)        event title/summary")
-print("$(date)         start date in Y/m/d format")
-print("$(time)         start time in H:M:S format")
-print("$(day)          numeric day of month")
-print("$(month)        numeric month of year")
-print("$(Year)         year in 4-digit format")
-print("$(year)         year in 2-digit format")
-print("$(monthname)    name of month")
-print("$(dayname)      name of day (Mon, Tue, Wed...)")
-print("$(dayid)        like dayname, except including 'today' and 'tomorrow'")
-print("$(dayid_color)  like dayid, but today will be in ansi red, tomorrow in ansi yellow")
-print("$(location)     event location")
-print("$(duration)     event duration")
+print("$(title)          event title/summary")
+print("$(date)           start date in Y/m/d format")
+print("$(time)           start time in H:M:S format")
+print("$(day)            numeric day of month")
+print("$(month)          numeric month of year")
+print("$(Year)           year in 4-digit format")
+print("$(year)           year in 2-digit format")
+print("$(monthname)      Full name of month ('Feburary')")
+print("$(monthnick)      Short name of month ('Feb')")
+print("$(dayname)        full name of day (Monday, Tuesday, Wednesday...)")
+print("$(daynick)        short name of day (Mon, Tues, Wed...)")
+print("$(dayid)          like dayname, except including 'today' and 'tomorrow'")
+print("$(dayid_color)    like dayid, but today will be in ansi red, tomorrow in ansi yellow")
+print("$(daynick_color)  like daynick, but today will be in ansi red, tomorrow in ansi yellow, although they will still have daynick names")
+print("$(location)       event location")
+print("$(duration)       event duration")
 print()
 print("color identifiers: format strings that specifier colors")
 print("~0      reset colors")
@@ -1368,6 +1381,10 @@ elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle"
 then 
 	Settings.XtermTitle=args[i+1]
 	args[i+1]=""
+elseif v=="-refresh"
+then
+	Settings.RefreshTime=ParseDuration(args[i+1])
+	args[i+1]=""
 elseif v=="-lfmt"
 then 
 	Settings.DisplayFormat=args[i+1]
@@ -1462,8 +1479,10 @@ Settings.ShowDetail=false
 -- xterm title line to display when in persist mode
 Settings.XtermTitle="$(dayname) $(day) $(monthname)"
 
+Settings.RefreshTime=ParseDuration("2m")
+
 -- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(dayid_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)"
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)"
 
 -- When importing from calendars that have long events, or events with open or misconfigured lengths, 
 -- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit
@@ -1517,11 +1536,12 @@ do
 	if Out ~= nil
 	then
 		XtermTitle()
+		print("\x1b]3J")
 		Out:clear()
 		Out:move(0,0)
 	end
 	OutputCalendar(Out, Events, selections)
-	process.sleep(100)
+	process.sleep(Settings.RefreshTime)
 	UpdateTimes()
 end
 end

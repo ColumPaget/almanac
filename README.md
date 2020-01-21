@@ -97,6 +97,7 @@ options:
    -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
+   -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.
    -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
    -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -u         Terminal supports unicode up to code 0x8000
@@ -146,10 +147,13 @@ $(day)          numeric day of month
 $(month)        numeric month of year
 $(Year)         year in 4-digit format
 $(year)         year in 2-digit format
-$(monthname)    name of month
-$(dayname)      name of day (Mon, Tue, Wed...)
-$(dayid)        like dayname, except including 'today' and 'tomorrow'
-$(dayid_color)  like dayid, but today will be in ansi red, tomorrow in ansi yellow
+$(monthname)      Full name of month ('Feburary')
+$(monthnick)      Short name of month ('Feb')
+$(dayname)        full name of day (Monday, Tuesday, Wednesday...)
+$(daynick)        short name of day (Mon, Tues, Wed...)
+$(dayid)          like dayname, except including 'today' and 'tomorrow'
+$(dayid_color)    like dayid, but today will be in ansi red, tomorrow in ansi yellow
+$(daynick_color)  like daynick, but today will be in ansi red, tomorrow in ansi yellow, although they will still have daynick names
 $(location)     event location
 $(duration)     event duration
 ```
