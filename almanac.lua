@@ -7,6 +7,7 @@ require("dataparser")
 require("terminal")
 require("filesys")
 require("time")
+require("hash")
 
 
 VERSION="2.0"
@@ -17,7 +18,8 @@ EventsNewest=0
 Now=0
 Today=""
 Tomorrow=""
-
+WarnEvents={}
+display_count=0
 
 
 --GENERIC FUNCTIONS
@@ -29,6 +31,65 @@ Tomorrow=time.formatsecs("%Y/%m/%d", Now+3600*24)
 end
 
 
+
+function DocumentGetType(S)
+local Tokens, str, ext
+local doctype=""
+
+str=S:getvalue("HTTP:Content-Type")
+if strutil.strlen(str) ~= 0
+then
+	Tokens=strutil.TOKENIZER(str, ";")
+	doctype=Tokens:next()
+
+	if doctype=="application/ical" then ext=".ical" 
+	elseif doctype=="application/rss" then ext=".rss"
+	elseif doctype=="text/calendar" 
+	then 
+		ext=".ical"
+		doctype="application/ical"
+	end
+else
+	str=S:path()
+	if strutil.strlen(str) ~= nil
+	then
+		ext=filesys.extn(str)
+		if ext==".ical" then doctype="application/ical" 
+		elseif ext==".rss" then doctype="application/rss" 
+		end
+	end
+end
+
+return doctype, ext
+end 
+
+
+
+
+function OpenCachedDocument(url)
+local str, dochash, doctype, extn, S
+local extns={".ical", ".rss"}
+
+dochash=hash.hashstr(url, "md5", "hex")
+
+for i,extn in ipairs(extns)
+do
+str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
+if filesys.exists(str) == true and (time.secs() - filesys.mtime(str)) < Settings.CacheTime then return(stream.STREAM(str, "r")) end
+end
+
+S=stream.STREAM(url)
+if S ~= nil
+then
+	doctype,extn=DocumentGetType(S)
+	S:close()
+	str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
+	filesys.copy(url, str)
+	return(stream.STREAM(str, "r"))
+end
+
+return nil
+end
 
 
 
@@ -202,6 +263,9 @@ then
 	if lead_digits == 8 --if it's ALL digits, then we have to presume YYYYmmdd
 	then
 	str=string.sub(datestr,1,4).."-"..string.sub(datestr,5,6).."-"..string.sub(datestr,7,8).."T00:00:00"
+	elseif string.sub(datestr, 3, 3) == ":"
+	then
+		str=time.format("%Y-%m-%dT")..string.sub(datestr,1,2)..":"..string.sub(datestr,4,6)..string.sub(datestr,7,8)
 	else
 	str="20"..string.sub(datestr,1,2).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,7,8).."T00:00:00"
 	end
@@ -238,6 +302,7 @@ then
 		str=string.sub(datestr,1,4).."-"..string.sub(datestr,6,7).."-"..string.sub(datestr,9,10).."T"..string.sub(datestr,12,13)..":"..string.sub(datestr, 15, 16)..":"..string.sub(datestr, 18)
 end
 
+print("add: "..str)
 when=time.tosecs("%Y-%m-%dT%H:%M:%S", str)
 return when
 end
@@ -439,10 +504,8 @@ end
 
 
 
-function RSSLoadEvents(Collated, S)
+function RSSLoadEvents(Collated, doc)
 local P, Events, Item, values, doc
-
-doc=S:readdoc()
 
 P=dataparser.PARSER("rss", doc)
 Events=P:open("/")
@@ -621,7 +684,8 @@ end
 --FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
 
 function AlmanacLoadCalendar(Collated, cal)
-local S, str, event, toks
+local S, str, event, toks, when
+local tmpTable={}
 
 str=process.getenv("HOME") .. time.format("/.almanac/%b-%Y.cal")
 S=stream.STREAM(str)
@@ -630,19 +694,33 @@ then
 str=S:readln()
 while str ~= nil
 do
-event=EventCreate()
-toks=strutil.TOKENIZER(str, "\\S", "Q")
-event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.UID=toks:next()
-event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.Title=toks:next()
-event.Location=toks:next()
-event.Details=strutil.unQuote(toks:next())
-table.insert(Collated, event)
-str=S:readln()
+	event=EventCreate()
+	toks=strutil.TOKENIZER(str, "\\S", "Q")
+	event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+	event.UID=toks:next()
+	event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+	event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+	event.Title=toks:next()
+	event.Location=toks:next()
+	event.Details=strutil.unQuote(toks:next())
+	tmpTable[event.UID]=event
+	str=S:readln()
 end
 S:close()
+end
+
+
+for key,event in pairs(tmpTable)
+do
+	when=Settings.WarnTime
+	if Settings.WarnRaisedTime > Settings.WarnTime then when=Settings.WarnRaisedTime end
+	io.stderr:write("WR: "..when.." "..(Now -event.Start) .. "\n")
+	if when > 0 and (Now - event.Start) < when
+	then
+		table.insert(WarnEvents, event)
+	end
+
+	table.insert(Collated, event)
 end
 
 end
@@ -670,42 +748,20 @@ end
 
 
 
-function DocumentGetType(S)
-local Tokens, str, ext
-local doctype=""
-
-str=S:getvalue("HTTP:Content-Type")
-if strutil.strlen(str) ~= 0
-then
-	Tokens=strutil.TOKENIZER(str, ";")
-	doctype=Tokens:next()
-else
-	str=S:path()
-	if strutil.strlen(str) ~= nil
-	then
-		ext=filesys.extn(str)
-		if ext==".ical" then doctype="application/ical" 
-		elseif ext==".rss" then doctype="application/rss" 
-		end
-	end
-end
-
-return doctype
-end 
-
-
 
 function DocumentLoadEvents(Events, url)
-local S, doctype
-S=stream.STREAM(url, "r");
+local S, doctype, doc
+
+S=OpenCachedDocument(url);
 if S ~= nil
 then
 	doctype=DocumentGetType(S)
+	doc=S:readdoc()
 	if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml" 
 	then 
-		RSSLoadEvents(Events, S)
+		RSSLoadEvents(Events, doc)
 	else
-		ICalLoadEvents(Events, S:readdoc())
+		ICalLoadEvents(Events, doc)
 	end
 else
 print(terminal.format("~rerror: cannot open '"..url.."'~0"))
@@ -1321,16 +1377,13 @@ local NewEvent
 NewEvent=EventCreate()
 NewEvent.Visibility="default"
 
+--as other values are set relative to EventsStart, so we have to grab any '-start' option before all others
 for i,v in ipairs(args)
 do
-if v=="-s" or v=="-start"
-then
-	EventsStart=ParseDate(args[i+1])
-	args[i+1]=""
-end
+if v=="-s" or v=="-start" then EventsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
-if EventsStart==0 then EventStart=time.secs() end
+if EventsStart==0 then EventsStart=time.secs() end
 
 for i,v in ipairs(args)
 do
@@ -1360,35 +1413,22 @@ then
 	--do nothing! this is handled by the earlier loop
 elseif v=="-end"
 then
-	EventsEnd=ParseDate(args[i+1])
-	args[i+1]=""
+	EventsEnd=ParseDate(ParseArg(args, i+1))
 elseif v=="-maxlen"
 then
-	Settings.EventMaxLength=ParseDuration(args[i+1])
-	args[i+1]=""
+	Settings.EventMaxLength=ParseDuration(ParseArg(args, i+1))
 elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg(args, i+1)
 elseif v=="-import"
 then
 	action="import"
-	selections=selections..args[i+1].."\n"
-	args[i+1]=""
-elseif v=="-email"
+	selections=selections..ParseArg(args, i+1).."\n"
+elseif v=="-email" or v=="-import-email"
 then
 	action="import-email"
-	selections=selections..args[i+1].."\n"
-	args[i+1]=""
-elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle" 
-then 
-	Settings.XtermTitle=args[i+1]
-	args[i+1]=""
-elseif v=="-refresh"
-then
-	Settings.RefreshTime=ParseDuration(args[i+1])
-	args[i+1]=""
-elseif v=="-lfmt"
-then 
-	Settings.DisplayFormat=args[i+1]
-	args[i+1]=""
+	selections=selections..ParseArg(args, i+1).."\n"
+elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
+elseif v=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
+elseif v=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
 elseif v=="-hide"
 then
 	if strutil.strlen(selections) > 0 then selections=selections.. ",!" ..ParseArg(args,i+1) else selections="!"..ParseArg(args, i+1) end
@@ -1397,9 +1437,12 @@ then
 	if strutil.strlen(selections) > 0 then selections=selections..","..ParseArg(args,i+1) else selections=ParseArg(args, i+1) end
 elseif v=="-old" then EventsStart=0
 elseif v=="-persist" then Settings.Persist=true 
+elseif v=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
+elseif v=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
 elseif v=="-of" then Settings.OutputFormat=ParseArg(args, i+1) 
 elseif v=="-u" or v=="-unicode" then  terminal.unicodelvl(1)
 elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
+elseif v=="-u3" or v=="-unicode3" then  terminal.unicodelvl(3)
 elseif v=="-?" or v=="-h" or v=="-help" or v=="--help"
 then
 	action="help"
@@ -1492,20 +1535,26 @@ Settings.MaxEventLength=-1
 --google calendar ClientID and ClientSecret for this app
 Settings.GCalClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
 Settings.GCalClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
+
+Settings.WarnTime=0
+Settings.WarnRaisedTime=0
+Settings.CacheTime=120
+
+UpdateTimes()
 end
 
 
 
-function XtermTitle()
+function XtermTitle(Out, title)
 local str
 local ev={}
 
-if strutil.strlen(Settings.XtermTitle) > 0
+if strutil.strlen(title) > 0
 then
 	ev.Start=Now;
 	ev.End=Now;
-	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(Settings.XtermTitle, ev))
-	print(str)			
+	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(title, ev))
+	Out:puts(str)			
 end
 end
 
@@ -1522,27 +1571,129 @@ OutputCalendar(Out, Events, selections)
 end
 
 
+function EventSoonest(WarnEvents)
+local i, event, soonest
+
+for i,event in ipairs(WarnEvents)
+do
+if soonest==nil or event.Start < soonest.Start then soonest=event end
+end
+
+return soonest
+end
+
+function WaitEvents(Out)
+local event, action="", ch, title
+
+	title=Settings.XtermTitle
+
+	if #WarnEvents > 0
+	then
+		event=EventSoonest(WarnEvents)
+		if event.Start < Settings.WarnRaisedTime then Out:puts("\x1b[5t") end
+
+		if display_count % 2 == 0
+		then
+		title=string.format("* * *   %s in %d mins", event.Title, math.floor((event.Start - Now) / 60))
+		else
+		title=string.format("_ _ _   %s in %d mins", event.Title, math.floor((event.Start - Now) / 60))
+		end
+
+		next_update=Now + 1	
+		Out:timeout(100) --one sec
+	else
+		Out:timeout(1000) --ten secs
+	end
+
+
+	XtermTitle(Out, title)
+	ch=Out:getc()
+
+	if ch=="m" then
+		action="menu"
+	elseif ch=="LEFT" then 
+		EventsStart=EventsStart - (3600 * 24 *7)
+		action="refresh"
+	elseif ch=="RIGHT" then 
+		EventsStart=EventsStart + (3600 * 24 *7)
+		action="refresh"
+	end
+
+	display_count=display_count + 1
+
+return action
+end
+
+
+function DisplayCalendarMenu(Out, calendars) 
+local menu, str
+local cal_list
+
+Out:clear()
+menu=terminal.TERMMENU(Out, 1, 1, Out:width() -1, Out:height() -1)
+menu:add("all")
+menu:add("Recently Added", "recent")
+
+toks=strutil.TOKENIZER(calendars,",")
+str=toks:next()
+while str ~= nil
+do
+	menu:add(str)	
+	str=toks:next()
+end
+
+str=menu:run()
+if str=="all"
+then
+	cal_list=calendars
+else
+	cal_list=str
+end
+
+return cal_list
+end
+
+
 -- This function loops around outputing a list of events
 function PersistentScheduleDisplay(calendars, selections)
-local Out, Events
+local Out, Events, action, next_update, display_calendars
 
 Out=terminal.TERM()
-XtermTitle()
+next_update=Now
 
+display_calendars=calendars
 while true
 do
 	Events={}
-	LoadCalendarEvents(calendars, selections, Events)
+	WarnEvents={}
+	LoadCalendarEvents(display_calendars, selections, Events)
+
 	if Out ~= nil
 	then
 		XtermTitle()
-		print("\x1b]3J")
+		print("\x1b[3J") -- clear scrollback buffer
 		Out:clear()
 		Out:move(0,0)
 	end
+
 	OutputCalendar(Out, Events, selections)
-	process.sleep(Settings.RefreshTime)
-	UpdateTimes()
+	next_update=Now + Settings.RefreshTime
+
+	while Now < next_update
+	do
+		action=WaitEvents(Out) 
+		if action == "refresh" 
+		then 
+			break 
+		elseif action == "menu"
+		then
+			display_calendars=DisplayCalendarMenu(Out, calendars)
+			Out:clear()
+			break
+		end
+		UpdateTimes()
+	end
+
 end
 end
 

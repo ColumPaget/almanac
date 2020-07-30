@@ -35,6 +35,7 @@ m:fizzPOP-Birminghams-Makerspace   - my local hacker/maker space
 
 ## ICAL calendars online
 ```
+https://launchlibrary.net/1.3/calendar/next/100                    - Launch Library's list of upcoming space launches
 http://events.ucl.ac.uk/calendar/events.ics                        - Events at University College London 
 http://www.sussex.ac.uk/broadcast/feed/event/sussex-lectures.ics   - Sussex Uni public lectures
 https://www.dur.ac.uk/scripts/events/ical.php?category=51          - Durham Uni public lectures
@@ -98,6 +99,8 @@ options:
    -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.
+	 -warn <when>                   when in persist mode put a warning in the xterm title bar if any event is due before 'when'. 'when' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
+	 -warn-raise <when>             when in persist mode put a warning in the xterm title bar AND RAISE THE WINDOW (this can be annoying, but it's meant to be) if any event is due before 'when'. 'when' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
    -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -u         Terminal supports unicode up to code 0x8000
@@ -125,6 +128,26 @@ The following options all relate to inserting an event into an almanac or a goog
 ```
 
 example: almanac.lua -add "dental appointment" -start "2020/01/23"
+
+
+##TIME FORMATS
+
+almanac accepts the following date/time formats:
+
+HH:MM:SS              -  6 digit time, date is 'today'
+YYYYMMDD              -  8 digit date, e.g. 19890101
+YY?MM?DD              -  6 digit date with any separator character OTHER THAN ':' (so ? can be anything, e.g. 89/01/01)
+YYYY?MM?DD            -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)
+YYYYMMDDTHHMM         -  8 digit date with time e.g. 19890101T11:40:00
+YYYYMMDDTHHMMSS       -  8 digit date with time e.g. 19890101T11:40:00
+YYYYMMDDTHHMMSSZ      -  8 digit date with time e.g. 19890101T11:40:00Z
+YYYY?MM?DDTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00
+
+Currently the following *discouraged* formats are also supported. Almanac doesn't have locale support yet and these support UK/international date format
+
+DD?MM?YYYY          -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)
+DD>>MM?YYYYTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00
+
 
 ## OUTPUT FORMATS
 the '-of' option can specify one of the following output formats:
