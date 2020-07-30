@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="2.0"
+VERSION="2.1"
 Settings={}
 EventsStart=time.secs()
 EventsEnd=0
@@ -258,14 +258,17 @@ local when=0
 len=string.len(datestr)
 lead_digits=CountDigits(datestr)
 
-if len==8
+if len==5 and string.sub(datestr, 3, 3) == ":"
+then
+	str=time.format("%Y-%m-%dT")..string.sub(datestr,1,2)..":"..string.sub(datestr,4,6)..":00"
+elseif len==8
 then
 	if lead_digits == 8 --if it's ALL digits, then we have to presume YYYYmmdd
 	then
 	str=string.sub(datestr,1,4).."-"..string.sub(datestr,5,6).."-"..string.sub(datestr,7,8).."T00:00:00"
 	elseif string.sub(datestr, 3, 3) == ":"
 	then
-		str=time.format("%Y-%m-%dT")..string.sub(datestr,1,2)..":"..string.sub(datestr,4,6)..string.sub(datestr,7,8)
+		str=time.format("%Y-%m-%dT")..string.sub(datestr,1,2)..":"..string.sub(datestr,4,6)..":"..string.sub(datestr,7,8)
 	else
 	str="20"..string.sub(datestr,1,2).."-"..string.sub(datestr,4,5).."-"..string.sub(datestr,7,8).."T00:00:00"
 	end
@@ -714,7 +717,6 @@ for key,event in pairs(tmpTable)
 do
 	when=Settings.WarnTime
 	if Settings.WarnRaisedTime > Settings.WarnTime then when=Settings.WarnRaisedTime end
-	io.stderr:write("WR: "..when.." "..(Now -event.Start) .. "\n")
 	if when > 0 and (Now - event.Start) < when
 	then
 		table.insert(WarnEvents, event)
@@ -1260,6 +1262,24 @@ print("   -import <path>         import events from a .ical/.ics file and upload
 print()
 print("example: almanac.lua -add \"dental appointment\" -start \"2020/01/23\"")
 print()
+print("TIME FORMATS")
+print("almanac accepts the following date/time formats:")
+print("")
+print("HH:MM                 -  4 digit time, date is 'today'")
+print("HH:MM:SS              -  6 digit time, date is 'today'")
+print("YYYYMMDD              -  8 digit date, e.g. 19890101")
+print("YY?MM?DD              -  6 digit date with any separator character OTHER THAN ':' (so ? can be anything, e.g. 89/01/01)")
+print("YYYY?MM?DD            -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)")
+print("YYYYMMDDTHHMM         -  8 digit date with time e.g. 19890101T11:40:00")
+print("YYYYMMDDTHHMMSS       -  8 digit date with time e.g. 19890101T11:40:00")
+print("YYYYMMDDTHHMMSSZ      -  8 digit date with time e.g. 19890101T11:40:00Z")
+print("YYYY?MM?DDTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00")
+print("")
+print("Currently the following *discouraged* formats are also supported. Almanac doesn't have locale support yet and these support UK/international date format")
+print("")
+print("DD?MM?YYYY            -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)")
+print("DD?MM?YYYYTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00")
+print("")
 print("OUTPUT FORMATS")
 print("the '-of' option can specify one of the following output formats:")
 print("csv     output comma-seperated-values suitable for reading into a spreadsheet.")
@@ -1581,6 +1601,7 @@ end
 
 return soonest
 end
+
 
 function WaitEvents(Out)
 local event, action="", ch, title

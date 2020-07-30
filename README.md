@@ -113,7 +113,9 @@ options:
    --help      This help
 ```
 
+
 ## ADD EVENTS
+
 The following options all relate to inserting an event into an almanac or a google calendar. if calendar is specified then the default almanac calendar (a:default) is assumed. You can instead use the user's primary google calendar by specifiying 'g:primary'
 ```
    -add <title>           add an event with specified title using the destination calendars default privacy setting
@@ -134,6 +136,7 @@ example: almanac.lua -add "dental appointment" -start "2020/01/23"
 
 almanac accepts the following date/time formats:
 
+HH:MM                 -  4 digit time, date is 'today'
 HH:MM:SS              -  6 digit time, date is 'today'
 YYYYMMDD              -  8 digit date, e.g. 19890101
 YY?MM?DD              -  6 digit date with any separator character OTHER THAN ':' (so ? can be anything, e.g. 89/01/01)
@@ -145,11 +148,12 @@ YYYY?MM?DDTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00
 
 Currently the following *discouraged* formats are also supported. Almanac doesn't have locale support yet and these support UK/international date format
 
-DD?MM?YYYY          -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)
-DD>>MM?YYYYTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00
+DD?MM?YYYY            -  8 digit date with any separator character (so ? can be anything, e.g. 1989:01:01)
+DD?MM?YYYYTHH?MM?SS   -  8 digit date with time e.g. 1989/01/01T11:40:00
 
 
 ## OUTPUT FORMATS
+
 the '-of' option can specify one of the following output formats:
 ```
 csv     output comma-seperated-values suitable for reading into a spreadsheet.
@@ -160,25 +164,26 @@ ansi    output text with ANSI color formatting
 ```
 
 ## DISPLAY FORMATS
+
 In the default mode, ansi display mode, you can specify the line-by-line output format by using a combination of color identifiers and data identifiers.
 data identifiers: these are strings that will be replaced by the specified value
 ```
-$(title)        event title/summary
-$(date)         start date in Y/m/d format
-$(time)         start time in H:M:S format
-$(day)          numeric day of month
-$(month)        numeric month of year
-$(Year)         year in 4-digit format
-$(year)         year in 2-digit format
-$(monthname)      Full name of month ('Feburary')
-$(monthnick)      Short name of month ('Feb')
-$(dayname)        full name of day (Monday, Tuesday, Wednesday...)
-$(daynick)        short name of day (Mon, Tues, Wed...)
-$(dayid)          like dayname, except including 'today' and 'tomorrow'
-$(dayid_color)    like dayid, but today will be in ansi red, tomorrow in ansi yellow
-$(daynick_color)  like daynick, but today will be in ansi red, tomorrow in ansi yellow, although they will still have daynick names
-$(location)     event location
-$(duration)     event duration
+$(title)           event title/summary
+$(date)            start date in Y/m/d format
+$(time)            start time in H:M:S format
+$(day)             numeric day of month
+$(month)           numeric month of year
+$(Year)            year in 4-digit format
+$(year)            year in 2-digit format
+$(monthname)       Full name of month ('Feburary')
+$(monthnick)       Short name of month ('Feb')
+$(dayname)         full name of day (Monday, Tuesday, Wednesday...)
+$(daynick)         short name of day (Mon, Tues, Wed...)
+$(dayid)           like dayname, except including 'today' and 'tomorrow'
+$(dayid_color)     like dayid, but today will be in ansi red, tomorrow in ansi yellow
+$(daynick_color)   like daynick, but today will be in ansi red, tomorrow in ansi yellow, although they will still have daynick names
+$(location)        event location
+$(duration)        event duration
 ```
 
 color identifiers: format strings that specifier colors
