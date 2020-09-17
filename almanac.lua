@@ -53,7 +53,7 @@ else
 	str=S:path()
 	if strutil.strlen(str) ~= nil
 	then
-		ext=filesys.extn(str)
+		ext=filesys.extn(filesys.basename(str))
 		if ext==".ical" then doctype="application/ical" 
 		elseif ext==".rss" then doctype="application/rss" 
 		end
@@ -71,6 +71,8 @@ local str, dochash, doctype, extn, S
 local extns={".ical", ".rss"}
 
 dochash=hash.hashstr(url, "md5", "hex")
+
+if filesys.exists(url) == true then return(stream.STREAM(url, "r")) end
 
 for i,extn in ipairs(extns)
 do
@@ -255,7 +257,7 @@ local len, lead_digits
 local str=""
 local when=0
 
-len=string.len(datestr)
+len=strutil.strlen(datestr)
 lead_digits=CountDigits(datestr)
 
 if len==5 and string.sub(datestr, 3, 3) == ":"
@@ -305,7 +307,6 @@ then
 		str=string.sub(datestr,1,4).."-"..string.sub(datestr,6,7).."-"..string.sub(datestr,9,10).."T"..string.sub(datestr,12,13)..":"..string.sub(datestr, 15, 16)..":"..string.sub(datestr, 18)
 end
 
-print("add: "..str)
 when=time.tosecs("%Y-%m-%dT%H:%M:%S", str)
 return when
 end
@@ -410,11 +411,10 @@ end
 
 
 function ICalParseTime(value, extra)
-local Tokens, str
+local Tokens, str, i
 local Timezone=""
 
-value=strutil.stripTrailingWhitespace(value);
-value=strutil.stripLeadingWhitespace(value);
+value=strutil.trim(value);
 
 Tokens=strutil.TOKENIZER(extra,";")
 str=Tokens:next()
@@ -557,7 +557,7 @@ if strutil.strlen(NewEvent.Visibility) > 0 then text=text.."\"visibility\": \"".
 text=text.."\"start\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.Start,"GMT") .. "\"\n},\n"
 text=text.."\"end\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.End,"GMT") .. "\"\n}\n"
 text=text.. "}"
-S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. string.len(text))
+S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. strutil.strlen(text))
 
 S:writeln(text)
 doc=S:readdoc()
@@ -884,15 +884,12 @@ line=S:readln()
 while line ~= nil
 do
 	if len > 0 and string.sub(line, 1, len) == boundary then break end
-
-	if encoding=="base64" 
-	then 
-		doc=doc..strutil.decode(line, "base64")
-	else
-		doc=doc..line
-	end
-line=S:readln()
+	if encoding=="base64" then line=strutil.trim(line) end
+	doc=doc..line
+	line=S:readln()
 end
+
+if encoding=="base64" then doc=strutil.decode(doc, "base64") end
 
 doc=string.gsub(doc, "\r\n", "\n")
 ICalLoadEvents(Events, doc)
@@ -1172,7 +1169,7 @@ toks=strutil.TOKENIZER(calendars,",")
 cal=toks:next()
 while cal ~= nil
 do
-if string.len(cal) > 0
+if strutil.strlen(cal) > 0
 then
 	if string.sub(cal,1, 2) == "a:" then AlmanacLoadCalendar(Events, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Events, string.sub(cal, 3)) 
