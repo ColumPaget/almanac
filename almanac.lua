@@ -901,6 +901,19 @@ end
 end
 
 
+function EmailHandleMimeContainer(S, mime_info)
+local str, boundary
+
+boundary="--" .. mime_info.boundary
+str=S:readln()
+while str ~= nil
+do
+	str=strutil.stripTrailingWhitespace(str)
+	if str==boundary then EmailHandleMimeItem(S, boundary, EventsFunc) end
+	str=S:readln()
+end
+end
+
 
 function EmailHandleMimeItem(S, boundary, EventsFunc)
 local mime_info
@@ -911,6 +924,9 @@ if mime_info.content_type == "text/calendar"
 then
 	EmailReadDocument(S, mime_info.boundary, mime_info.encoding, EventsFunc)
 	mime_info.content_type=""
+elseif mime_info.content_type == "multipart/mixed"
+then
+	EmailHandleMimeContainer(S, mime_info)
 end
 
 end
@@ -924,15 +940,7 @@ S=stream.STREAM(path, "r")
 if S ~= nil
 then
 mime_info=EmailReadHeaders(S)
-
-boundary="--" .. mime_info.boundary
-str=S:readln()
-while str ~= nil
-do
-	str=strutil.stripTrailingWhitespace(str)
-	if str==boundary then EmailHandleMimeItem(S, boundary, EventsFunc) end
-	str=S:readln()
-end
+EmailHandleMimeContainer(S, mime_info)
 S:close()
 end
 
