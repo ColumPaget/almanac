@@ -879,6 +879,7 @@ local line, event, i, len
 local doc=""
 local Events={}
 
+if config.debug==true then io.stderr:write("extract:  enc="..encoding.." boundary="..boundary.."\n") end
 len=strutil.strlen(boundary)
 line=S:readln()
 while line ~= nil
@@ -889,8 +890,16 @@ do
 	line=S:readln()
 end
 
-if encoding=="base64" then doc=strutil.decode(doc, "base64") end
+if encoding=="base64"
+then
+	doc=strutil.decode(doc, "base64") 
+elseif encoding=="quoted-printable"
+then 
+	doc=strutil.decode(doc, "quoted-printable") 
+end
 
+
+if config.debug==true then io.stderr:write("doc:  "..doc.."\n") end
 doc=string.gsub(doc, "\r\n", "\n")
 ICalLoadEvents(Events, doc)
 for i,event in ipairs(Events)
@@ -901,7 +910,7 @@ end
 end
 
 
-function EmailHandleMimeContainer(S, mime_info)
+function EmailHandleMimeContainer(S, mime_info, EventsFunc)
 local str, boundary
 
 boundary="--" .. mime_info.boundary
@@ -920,13 +929,14 @@ local mime_info
 
 mime_info=EmailReadHeaders(S)
 
+if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_type.." enc="..mime_info.encoding.." boundary="..mime_info.boundary.."\n") end
 if mime_info.content_type == "text/calendar"
 then
-	EmailReadDocument(S, mime_info.boundary, mime_info.encoding, EventsFunc)
+	EmailReadDocument(S, boundary, mime_info.encoding, EventsFunc)
 	mime_info.content_type=""
 elseif mime_info.content_type == "multipart/mixed"
 then
-	EmailHandleMimeContainer(S, mime_info)
+	EmailHandleMimeContainer(S, mime_info, EventsFunc)
 end
 
 end
@@ -940,7 +950,7 @@ S=stream.STREAM(path, "r")
 if S ~= nil
 then
 mime_info=EmailReadHeaders(S)
-EmailHandleMimeContainer(S, mime_info)
+EmailHandleMimeContainer(S, mime_info, EventsFunc)
 S:close()
 end
 
@@ -1396,8 +1406,13 @@ local i, v, val
 local action="none"
 local calendars=""
 local selections=""
-local locations=""
 local NewEvent
+local Config={}
+
+Config.action="none"
+Config.debug=false
+Config.calendars=""
+Config.selections=""
 
 NewEvent=EventCreate()
 NewEvent.Visibility="default"
@@ -1413,7 +1428,8 @@ if EventsStart==0 then EventsStart=time.secs() end
 for i,v in ipairs(args)
 do
 
-if v=="-h" or v=="-hour"  then EventsEnd=EventsStart + 3600 * ParseNumericArg(args,i)
+if v=="-debug" then Config.debug=true
+elseif v=="-h" or v=="-hour"  then EventsEnd=EventsStart + 3600 * ParseNumericArg(args,i)
 elseif v=="-d" or v=="-day" or v=="-days" then EventsEnd=EventsStart + 3600 * 24 * ParseNumericArg(args,i)
 elseif v=="-w" or v=="-week" then EventsEnd=EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
 elseif v=="-m" or v=="-month" then EventsEnd=EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
@@ -1421,17 +1437,17 @@ elseif v=="-y" or v=="-year" then EventsEnd=EventsStart + 3600 * 24 * 365 * Pars
 elseif v=="-detail" or v=="-details" or v=="-v" then Settings.ShowDetail=true
 elseif v=="-add" 
 then 
-		action="add"
-		NewEvent.Title=ParseArg(args, i+1)
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
 elseif v=="-addpub" 
 then 
-	action="add"
-  NewEvent.Title=ParseArg(args, i+1)
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="public"
 elseif v=="-addpriv"
 then
-	action="add"
-  NewEvent.Title=ParseArg(args, i+1)
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
 elseif v=="-start" or v=="-s"
 then
@@ -1445,21 +1461,21 @@ then
 elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg(args, i+1)
 elseif v=="-import"
 then
-	action="import"
-	selections=selections..ParseArg(args, i+1).."\n"
+	Config.action="import"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
 elseif v=="-email" or v=="-import-email"
 then
-	action="import-email"
-	selections=selections..ParseArg(args, i+1).."\n"
+	Config.action="import-email"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
 elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
 elseif v=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
 elseif v=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
 elseif v=="-hide"
 then
-	if strutil.strlen(selections) > 0 then selections=selections.. ",!" ..ParseArg(args,i+1) else selections="!"..ParseArg(args, i+1) end
+	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections.. ",!" ..ParseArg(args,i+1) else Config.selections="!"..ParseArg(args, i+1) end
 elseif v=="-show"
 then
-	if strutil.strlen(selections) > 0 then selections=selections..","..ParseArg(args,i+1) else selections=ParseArg(args, i+1) end
+	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
 elseif v=="-old" then EventsStart=0
 elseif v=="-persist" then Settings.Persist=true 
 elseif v=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
@@ -1470,14 +1486,14 @@ elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
 elseif v=="-u3" or v=="-unicode3" then  terminal.unicodelvl(3)
 elseif v=="-?" or v=="-h" or v=="-help" or v=="--help"
 then
-	action="help"
+	Config.action="help"
 else
-	if strutil.strlen(v) > 0 then calendars=calendars..","..v end
+	if strutil.strlen(v) > 0 then Config.calendars=Config.calendars..","..v end
 end
 
 end
 
-if strutil.strlen(calendars)==0 then calendars="a:default" end
+if strutil.strlen(Config.calendars)==0 then Config.calendars="a:default" end
 
 if strutil.strlen(NewEvent.Title) > 0
 then
@@ -1490,7 +1506,7 @@ then
 	end
 end
 
-return action, NewEvent, calendars, selections 
+return Config, NewEvent
 end
 
 
@@ -1726,22 +1742,22 @@ end
 
 ------------   Main starts here  -----------------------
 Init()
-action,event,calendars,selections=ParseCommandLine(arg)
+config,event=ParseCommandLine(arg)
 UpdateTimes()
 
-if action=="help" 
+if config.action=="help" 
 then
 	PrintHelp()
-elseif action=="add"
+elseif config.action=="add"
 then
 	AlmanacAddEvent(event)
 	--if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
-elseif action=="import" or action=="import-email"
+elseif config.action=="import" or config.action=="import-email"
 then
-	ImportItems(action, selections)
+	ImportItems(config.action, config.selections)
 elseif Settings.Persist==true
 then
-	PersistentScheduleDisplay(calendars, selections)
+	PersistentScheduleDisplay(config.calendars, config.selections)
 else
-	LoadAndOutputCalendar(calendars, selections)
+	LoadAndOutputCalendar(config.calendars, config.selections)
 end
