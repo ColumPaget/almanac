@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="2.1"
+VERSION="2.2"
 Settings={}
 EventsStart=time.secs()
 EventsEnd=0
