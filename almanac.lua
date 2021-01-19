@@ -12,8 +12,6 @@ require("hash")
 
 VERSION="2.2"
 Settings={}
-EventsStart=time.secs()
-EventsEnd=0
 EventsNewest=0
 Now=0
 Today=""
@@ -607,9 +605,9 @@ then
 end
 
 url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events?singleEvents=true"
-if EventsStart > 0
+if config.EventsStart > 0
 then 
-	url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", EventsStart))
+	url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", config.EventsStart))
 end
 
 S=stream.STREAM(url,"oauth="..OA:name())
@@ -1100,19 +1098,19 @@ end
 
 
 -- called by 'OutputCalendar' to check if an event has been 'hidden' and should not be displayed
-function EventShow(event, Selections) 
+function EventShow(event, config)
 local TOK, pattern, invert
 local result=false
 
-if EventsStart==nil then print("ERROR: Events start==nil") end
+if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
 
 if event.Start == nil then return false end
-if event.Start < EventsStart then return false end
-if EventsEnd > 0 and event.Start > EventsEnd then return false end
+if event.Start < config.EventsStart then return false end
+if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end
 
-if strutil.strlen(Selections)==0 then return true end
+if strutil.strlen(config.selections)==0 then return true end
 
-TOK=strutil.TOKENIZER(Selections,",")
+TOK=strutil.TOKENIZER(config.selections,",")
 pattern=TOK:next()
 while pattern ~= nil
 do
@@ -1139,8 +1137,9 @@ end
 
 
 
-function OutputCalendar(Out, Events, Selections)
+function OutputCalendar(Out, Events, config)
 local i, event
+local displayed_events_count=0
 
 if Settings.OutputFormat=="csv" then OutputCSVHeader(Out) 
 elseif Settings.OutputFormat=="ical" then OutputICALHeader(Out) 
@@ -1149,7 +1148,7 @@ end
 
 for i,event in ipairs(Events)
 do
-	if EventShow(event, Selections) 
+	if EventShow(event, config) 
 	then
 		if Settings.OutputFormat=="csv" then OutputEventCSV(Out, event) 
 		elseif Settings.OutputFormat=="ical" then OutputEventICAL(Out, event) 
@@ -1157,11 +1156,15 @@ do
 		elseif Settings.OutputFormat=="txt" then OutputEventTXT(event) 
 		else OutputEventANSI(event)
 		end
+	displayed_events_count=displayed_events_count + 1
 	end
 end
 
 if Settings.OutputFormat=="csv" then OutputCSVTrailer(Out) 
-elseif Settings.OutputFormat=="ical" then OutputICALTrailer(Out) 
+elseif Settings.OutputFormat=="ical" then OutputICALTrailer(Out)
+elseif Settings.OutputFormat==""
+then  
+	if displayed_events_count==0 then print(terminal.format("~r" .. "no events to display" .. "~0")) end
 end
 
 end
@@ -1202,7 +1205,7 @@ end
 if #Events > 0
 then
 	table.sort(Events, EventsSort)
-	if EventsNewest < Now or #Events < 2 then EventsStart=0 end
+	--if EventsNewest < Now or #Events < 2 then config.EventsStart=0 end
 end
 
 end
@@ -1413,27 +1416,29 @@ Config.action="none"
 Config.debug=false
 Config.calendars=""
 Config.selections=""
+Config.EventsStart=time.secs()
+Config.EventsEnd=0
 
 NewEvent=EventCreate()
 NewEvent.Visibility="default"
 
---as other values are set relative to EventsStart, so we have to grab any '-start' option before all others
+--as other values are set relative to Config.EventsStart, so we have to grab any '-start' option before all others
 for i,v in ipairs(args)
 do
-if v=="-s" or v=="-start" then EventsStart=ParseDate(ParseArg(args, i+1)) end
+if v=="-s" or v=="-start" then Config.EventsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
-if EventsStart==0 then EventsStart=time.secs() end
+if Config.EventsStart==0 then Config.EventsStart=time.secs() end
 
 for i,v in ipairs(args)
 do
 
 if v=="-debug" then Config.debug=true
-elseif v=="-h" or v=="-hour"  then EventsEnd=EventsStart + 3600 * ParseNumericArg(args,i)
-elseif v=="-d" or v=="-day" or v=="-days" then EventsEnd=EventsStart + 3600 * 24 * ParseNumericArg(args,i)
-elseif v=="-w" or v=="-week" then EventsEnd=EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
-elseif v=="-m" or v=="-month" then EventsEnd=EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
-elseif v=="-y" or v=="-year" then EventsEnd=EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
+elseif v=="-h" or v=="-hour"  then Config.EventsEnd=Config.EventsStart + 3600 * ParseNumericArg(args,i)
+elseif v=="-d" or v=="-day" or v=="-days" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * ParseNumericArg(args,i)
+elseif v=="-w" or v=="-week" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
+elseif v=="-m" or v=="-month" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
+elseif v=="-y" or v=="-year" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
 elseif v=="-detail" or v=="-details" or v=="-v" then Settings.ShowDetail=true
 elseif v=="-add" 
 then 
@@ -1454,7 +1459,7 @@ then
 	--do nothing! this is handled by the earlier loop
 elseif v=="-end"
 then
-	EventsEnd=ParseDate(ParseArg(args, i+1))
+	Config.EventsEnd=ParseDate(ParseArg(args, i+1))
 elseif v=="-maxlen"
 then
 	Settings.EventMaxLength=ParseDuration(ParseArg(args, i+1))
@@ -1476,7 +1481,7 @@ then
 elseif v=="-show"
 then
 	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
-elseif v=="-old" then EventsStart=0
+elseif v=="-old" then Config.EventsStart=0
 elseif v=="-persist" then Settings.Persist=true 
 elseif v=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
 elseif v=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
@@ -1497,12 +1502,12 @@ if strutil.strlen(Config.calendars)==0 then Config.calendars="a:default" end
 
 if strutil.strlen(NewEvent.Title) > 0
 then
-	NewEvent.Start=EventsStart
-	if EventsEnd > 0 
+	NewEvent.Start=Config.EventsStart
+	if Config.EventsEnd > 0 
 	then 
-		NewEvent.End=EventsEnd
+		NewEvent.End=Config.EventsEnd
 	else
-		NewEvent.End=EventsStart
+		NewEvent.End=Config.EventsStart
 	end
 end
 
@@ -1601,13 +1606,13 @@ end
 
 
 
-function LoadAndOutputCalendar(calendars, selections)
+function LoadAndOutputCalendar(config)
 local Out
 local Events={}
 
 Out=stream.STREAM("-")
-LoadCalendarEvents(calendars, selections, Events)
-OutputCalendar(Out, Events, selections)
+LoadCalendarEvents(config.calendars, config.selections, Events)
+OutputCalendar(Out, Events, config)
 
 end
 
@@ -1654,10 +1659,10 @@ local event, action="", ch, title
 	if ch=="m" then
 		action="menu"
 	elseif ch=="LEFT" then 
-		EventsStart=EventsStart - (3600 * 24 *7)
+		config.EventsStart=config.EventsStart - (3600 * 24 *7)
 		action="refresh"
 	elseif ch=="RIGHT" then 
-		EventsStart=EventsStart + (3600 * 24 *7)
+		config.EventsStart=config.EventsStart + (3600 * 24 *7)
 		action="refresh"
 	end
 
@@ -1697,18 +1702,18 @@ end
 
 
 -- This function loops around outputing a list of events
-function PersistentScheduleDisplay(calendars, selections)
+function PersistentScheduleDisplay(config)
 local Out, Events, action, next_update, display_calendars
 
 Out=terminal.TERM()
 next_update=Now
 
-display_calendars=calendars
+display_calendars=config.calendars
 while true
 do
 	Events={}
 	WarnEvents={}
-	LoadCalendarEvents(display_calendars, selections, Events)
+	LoadCalendarEvents(display_calendars, config.selections, Events)
 
 	if Out ~= nil
 	then
@@ -1718,7 +1723,7 @@ do
 		Out:move(0,0)
 	end
 
-	OutputCalendar(Out, Events, selections)
+	OutputCalendar(Out, Events, config)
 	next_update=Now + Settings.RefreshTime
 
 	while Now < next_update
@@ -1729,7 +1734,7 @@ do
 			break 
 		elseif action == "menu"
 		then
-			display_calendars=DisplayCalendarMenu(Out, calendars)
+			display_calendars=DisplayCalendarMenu(Out, config.calendars)
 			Out:clear()
 			break
 		end
@@ -1757,7 +1762,7 @@ then
 	ImportItems(config.action, config.selections)
 elseif Settings.Persist==true
 then
-	PersistentScheduleDisplay(config.calendars, config.selections)
+	PersistentScheduleDisplay(config)
 else
-	LoadAndOutputCalendar(config.calendars, config.selections)
+	LoadAndOutputCalendar(config)
 end
