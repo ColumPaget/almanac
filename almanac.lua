@@ -83,6 +83,7 @@ if S ~= nil
 then
 	doctype,extn=DocumentGetType(S)
 	S:close()
+	if extn==nil then extn="" end
 	str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
 	filesys.copy(url, str)
 	return(stream.STREAM(str, "r"))
