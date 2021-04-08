@@ -18,7 +18,8 @@ Today=""
 Tomorrow=""
 WarnEvents={}
 display_count=0
-
+Out=nil
+Term=nil
 
 --GENERIC FUNCTIONS
 
@@ -325,7 +326,10 @@ else
 tempstr=""
 end
 
-Event.Location=tmpstr
+if string.sub(tmpstr, 1, 6) == "https:" then Event.URL=tmpstr
+else Event.Location=tmpstr
+end
+
 end
 
 
@@ -346,6 +350,7 @@ Event.Details=""
 Event.Visibility=""
 Event.Start=0
 Event.End=0
+Event.URL=""
 
 return Event
 end
@@ -453,6 +458,7 @@ do
 		Event.Start=ICalParseTime(value, extra)
 	elseif key=="DTEND" then Event.End=ICalParseTime(value, extra)
 	elseif key=="ATTENDEE" then Event.Attendees=Event.Attendees+1 
+	elseif key=="X-MICROSOFT-SKYPETEAMSMEETINGURL" then Event.URL=value
 	end
 
 	key,value,extra=ICalNextLine(lines)
@@ -705,6 +711,7 @@ do
 	event.Title=toks:next()
 	event.Location=toks:next()
 	event.Details=strutil.unQuote(toks:next())
+	event.URL=strutil.unQuote(toks:next())
 	tmpTable[event.UID]=event
 	str=S:readln()
 end
@@ -741,6 +748,7 @@ then
 str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
 str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
 str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. string.gsub(event.Details, "\n", "\\n") .."\""
+if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
 S:writeln(str.."\n")
 S:close()
 end
@@ -977,7 +985,7 @@ Out:writeln("DTSTART:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start).."\n")
 
 if event.End > 0
 then 
-	diff=event.End-Event.Start
+	diff=event.End-event.Start
 	if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength
 	then 
 		Out:writeln("DTEND:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start + Settings.MaxEventLength).."\n") 
@@ -1057,6 +1065,11 @@ end
 function OutputEventANSI(event)
 str=SubstituteEventStrings(Settings.DisplayFormat, event)
 print(terminal.format(str))
+if (Settings.ShowURL or Settings.ShowDetail) and (strutil.strlen(event.URL) > 0)
+then
+	print("  " .. event.URL)
+end
+
 if Settings.ShowDetail 
 then 
 	if strutil.strlen(event.Details) > 0 then print(terminal.format(event.Details)) end
@@ -1088,6 +1101,13 @@ date=time.formatsecs("%Y%m%d",event.Start);
 if date==Today then str=str.." Today" end
 if date==Tomorrow then str=str.." Tomorrow" end
 print(terminal.format(str))
+
+if (Settings.ShowURL or Settings.ShowDetail) and (strutil.strlen(event.URL) > 0)
+then
+	print("  " .. event.URL)
+end
+
+
 if Settings.ShowDetail 
 then 
 	print(event.Details) 
@@ -1136,9 +1156,22 @@ return result
 end
 
 
+function OutputEvent(event)
+
+if event ~= nil
+then
+if Settings.OutputFormat=="csv" then OutputEventCSV(Out, event) 
+elseif Settings.OutputFormat=="ical" then OutputEventICAL(Out, event) 
+elseif Settings.OutputFormat=="sgical" then OutputEventSGIcal(Out, event) 
+elseif Settings.OutputFormat=="txt" then OutputEventTXT(event) 
+else OutputEventANSI(event)
+end
+end
+
+end
 
 
-function OutputCalendar(Out, Events, config)
+function OutputCalendar(Events, config)
 local i, event
 local displayed_events_count=0
 
@@ -1151,12 +1184,7 @@ for i,event in ipairs(Events)
 do
 	if EventShow(event, config) 
 	then
-		if Settings.OutputFormat=="csv" then OutputEventCSV(Out, event) 
-		elseif Settings.OutputFormat=="ical" then OutputEventICAL(Out, event) 
-		elseif Settings.OutputFormat=="sgical" then OutputEventSGIcal(Out, event) 
-		elseif Settings.OutputFormat=="txt" then OutputEventTXT(event) 
-		else OutputEventANSI(event)
-		end
+	OutputEvent(event)
 	displayed_events_count=displayed_events_count + 1
 	end
 end
@@ -1247,10 +1275,13 @@ print("   -hide <pattern>  hide events whose title matches fnmatch/shell style p
 print("   -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'")
 print("   -detail     print event description/details")
 print("   -details    print event description/details")
+print("   -show-url   print event with event connect url (for Zoom or Teams meetings) on a line below")
 print("   -old        show events that are in the past")
 print("   -import <url>  Import events from specified URL (usually an ical file) into calendar")
 print("   -import-email <url>  Import events from ical attachments within an email file at the specified URL into calendar")
 print("   -persist    don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.")
+print("   -convert <url>  Output events from specified URL (usually an ical file) in output format set with '-of'")
+print("   -convert-email <url>  Output events from ical attachments within an email file at the specified URL in format set with '-of'")
 print("   -lfmt <format string>          line format for ansi output (see 'display formats' for details of title strings)")
 print("   -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
 print("   -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
@@ -1441,6 +1472,7 @@ elseif v=="-w" or v=="-week" then Config.EventsEnd=Config.EventsStart + 3600 * 2
 elseif v=="-m" or v=="-month" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
 elseif v=="-y" or v=="-year" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
 elseif v=="-detail" or v=="-details" or v=="-v" then Settings.ShowDetail=true
+elseif v=="-show-url" then Settings.ShowURL=true
 elseif v=="-add" 
 then 
 	Config.action="add"
@@ -1472,6 +1504,14 @@ then
 elseif v=="-email" or v=="-import-email"
 then
 	Config.action="import-email"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif v=="-convert"
+then
+	Config.action="convert"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif v=="-email" or v=="-convert-email"
+then
+	Config.action="convert-email"
 	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
 elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
 elseif v=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
@@ -1536,59 +1576,27 @@ end
 end
 
 
+function ConvertItems(action, items)
+local toks, url, Events={}
 
+toks=strutil.TOKENIZER(items, "\n")
+url=toks:next()
+while url ~= nil
+do
+	if action=="convert-email"
+	then
+	EmailExtractCalendarItems(url, OutputEvent)
+	else
+	DocumentLoadEvents(Events, url)
+	OutputCalendar(Events, config)
+	end
 
-function SetupTerminal()
-local S
-local Out=nil
-
-S=stream.STREAM("stdout")
-if S:isatty() == true
-then
-Out=terminal.TERM(S)
+url=toks:next()
 end
 
-return Out
 end
 
 
-
---this function sets up initial values of some settings
-function Init()
-
--- output format can be 'csv', 'ical', 'sgical', 'txt' and 'ansi'. default is ansi
-Settings.OutputFormat=""
-
--- persist means instead of just print out a list of events, print out the list, sleep for a bit,
--- clear screen and print out again in an eternal loop
-Settings.Persist=false
-
--- if 'ShowDetail' is true then display event descriptions as well as summary/title
-Settings.ShowDetail=false
-
--- xterm title line to display when in persist mode
-Settings.XtermTitle="$(dayname) $(day) $(monthname)"
-
-Settings.RefreshTime=ParseDuration("2m")
-
--- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)"
-
--- When importing from calendars that have long events, or events with open or misconfigured lengths, 
--- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit
-Settings.MaxEventLength=-1
-
-
---google calendar ClientID and ClientSecret for this app
-Settings.GCalClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
-Settings.GCalClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
-
-Settings.WarnTime=0
-Settings.WarnRaisedTime=0
-Settings.CacheTime=120
-
-UpdateTimes()
-end
 
 
 
@@ -1608,12 +1616,10 @@ end
 
 
 function LoadAndOutputCalendar(config)
-local Out
 local Events={}
 
-Out=stream.STREAM("-")
 LoadCalendarEvents(config.calendars, config.selections, Events)
-OutputCalendar(Out, Events, config)
+OutputCalendar(Events, config)
 
 end
 
@@ -1676,9 +1682,11 @@ end
 function DisplayCalendarMenu(Out, calendars) 
 local menu, str
 local cal_list
+local Term
 
-Out:clear()
-menu=terminal.TERMMENU(Out, 1, 1, Out:width() -1, Out:height() -1)
+Term=terminal.TERM(Out)
+Term:clear()
+menu=terminal.TERMMENU(Term, 1, 1, Term:width() -1, Term:height() -1)
 menu:add("all")
 menu:add("Recently Added", "recent")
 
@@ -1702,11 +1710,14 @@ return cal_list
 end
 
 
+
 -- This function loops around outputing a list of events
 function PersistentScheduleDisplay(config)
-local Out, Events, action, next_update, display_calendars
+local Events, action, next_update, display_calendars
+local Term
 
-Out=terminal.TERM()
+Term=terminal.TERM(Out)
+
 next_update=Now
 
 display_calendars=config.calendars
@@ -1716,33 +1727,81 @@ do
 	WarnEvents={}
 	LoadCalendarEvents(display_calendars, config.selections, Events)
 
-	if Out ~= nil
+	if Term ~= nil
 	then
 		XtermTitle()
-		print("\x1b[3J") -- clear scrollback buffer
-		Out:clear()
-		Out:move(0,0)
+		Term:puts("\x1b[3J") -- clear scrollback buffer
+		Term:clear()
+		Term:move(0,0)
 	end
 
-	OutputCalendar(Out, Events, config)
+	OutputCalendar(Events, config)
 	next_update=Now + Settings.RefreshTime
 
 	while Now < next_update
 	do
-		action=WaitEvents(Out) 
+		action=WaitEvents(Term) 
 		if action == "refresh" 
 		then 
 			break 
 		elseif action == "menu"
 		then
-			display_calendars=DisplayCalendarMenu(Out, config.calendars)
-			Out:clear()
+			display_calendars=DisplayCalendarMenu(Term, config.calendars)
+			Term:clear()
 			break
 		end
 		UpdateTimes()
 	end
 
 end
+end
+
+
+
+
+
+
+
+
+--this function sets up initial values of some settings
+function Init()
+Out=stream.STREAM("-")
+
+-- output format can be 'csv', 'ical', 'sgical', 'txt' and 'ansi'. default is ansi
+Settings.OutputFormat=""
+
+-- persist means instead of just print out a list of events, print out the list, sleep for a bit,
+-- clear screen and print out again in an eternal loop
+Settings.Persist=false
+
+-- if 'ShowDetail' is true then display event descriptions as well as summary/title
+Settings.ShowDetail=false
+
+-- if 'ShowURL' is true then display URL (e.g. teams meeting url) as well as summary/title
+Settings.ShowURL=false
+
+-- xterm title line to display when in persist mode
+Settings.XtermTitle="$(dayname) $(day) $(monthname)"
+
+Settings.RefreshTime=ParseDuration("2m")
+
+-- 'DisplayFormat' is used in 'ansi' output (the default display type) 
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)"
+
+-- When importing from calendars that have long events, or events with open or misconfigured lengths, 
+-- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit
+Settings.MaxEventLength=-1
+
+
+--google calendar ClientID and ClientSecret for this app
+Settings.GCalClientID="280062219812-m3qcd80umr6fk152fckstbmdm30tt2sa.apps.googleusercontent.com"
+Settings.GCalClientSecret="5eyXi7huoe99ylXqMiaIxVMd"
+
+Settings.WarnTime=0
+Settings.WarnRaisedTime=0
+Settings.CacheTime=120
+
+UpdateTimes()
 end
 
 
@@ -1761,6 +1820,9 @@ then
 elseif config.action=="import" or config.action=="import-email"
 then
 	ImportItems(config.action, config.selections)
+elseif config.action=="convert" or config.action=="convert-email"
+then
+	ConvertItems(config.action, config.selections)
 elseif Settings.Persist==true
 then
 	PersistentScheduleDisplay(config)

@@ -90,18 +90,19 @@ options:
    -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'
    -detail     print event description/details
    -details    print event description/details
+   -show-url   print event with event connect url (for Zoom or Teams meetings) on a line below
    -old        show events that are in the past
    -import <url>  Import events from specified URL (usually an ical file) into calendar
    -import-email <url>  Import events from ical attachments within an email file at the specified URL into calendar
    -persist    don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.
+   -convert <url>  Output events from specified URL (usually an ical file) in output format set with '-of'
+   -convert-email <url>  Output events from ical attachments within an email file at the specified URL in format set with '-of'
    -lfmt <format string>          line format for ansi output (see 'display formats' for details of title strings)
    -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
-   -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.
-	 -warn <when>                   when in persist mode put a warning in the xterm title bar if any event is due before 'when'. 'when' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
-	 -warn-raise <when>             when in persist mode put a warning in the xterm title bar AND RAISE THE WINDOW (this can be annoying, but it's meant to be) if any event is due before 'when'. 'when' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
+   -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.
    -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
    -u         Terminal supports unicode up to code 0x8000
    -unicode   Terminal supports unicode up to code 0x8000
@@ -111,6 +112,7 @@ options:
    -h          This help
    -help       This help
    --help      This help
+
 ```
 
 
@@ -250,3 +252,4 @@ import all ical attachments in an email file into local calendar
 ```
 	almanac.lua a:default -import-email mailfile.mail
 ```
+
