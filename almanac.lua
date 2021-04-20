@@ -433,6 +433,22 @@ return(ParseDate(value))
 end
 
 
+function ICalPostProcess(Event)
+local toks, tok
+
+if Event.Location=="LoopUp"
+then
+toks=strutil.TOKENIZER(Event.Details, "\n")
+str=toks:next()
+while str~=nil
+do
+	if str=="LoopUp details:" then Event.URL=toks:next() .. " "..toks:next() .. " ".. toks:next() end
+	str=toks:next()
+end
+end
+
+end
+
 
 function ICalParseEvent(lines, Events)
 local key, value, extra, tmpstr
@@ -463,6 +479,8 @@ do
 
 	key,value,extra=ICalNextLine(lines)
 end
+
+ICalPostProcess(Event)
 
 table.insert(Events, Event)
 end
