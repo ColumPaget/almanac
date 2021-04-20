@@ -1618,7 +1618,7 @@ end
 
 
 
-function XtermTitle(Out, title)
+function XtermTitle(Term, title)
 local str
 local ev={}
 
@@ -1627,7 +1627,7 @@ then
 	ev.Start=Now;
 	ev.End=Now;
 	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(title, ev))
-	Out:puts(str)			
+	Term:puts(str)			
 end
 end
 
@@ -1747,7 +1747,7 @@ do
 
 	if Term ~= nil
 	then
-		XtermTitle()
+		XtermTitle(Term, Settings.XtermTitle)
 		Term:puts("\x1b[3J") -- clear scrollback buffer
 		Term:clear()
 		Term:move(0,0)
@@ -1804,7 +1804,7 @@ Settings.XtermTitle="$(dayname) $(day) $(monthname)"
 Settings.RefreshTime=ParseDuration("2m")
 
 -- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~e~m$(title)~0 $(location)"
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~m$(title)~0 $(location)"
 
 -- When importing from calendars that have long events, or events with open or misconfigured lengths, 
 -- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit
