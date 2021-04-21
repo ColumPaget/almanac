@@ -433,11 +433,9 @@ return(ParseDate(value))
 end
 
 
-function ICalPostProcess(Event)
+function ICalPostProcessLoopUp(Event)
 local toks, tok
 
-if Event.Location=="LoopUp"
-then
 toks=strutil.TOKENIZER(Event.Details, "\n")
 str=toks:next()
 while str~=nil
@@ -445,6 +443,38 @@ do
 	if str=="LoopUp details:" then Event.URL=toks:next() .. " "..toks:next() .. " ".. toks:next() end
 	str=toks:next()
 end
+end
+
+
+function ICalPostProcessMSTeams(Event)
+local toks, tok
+
+toks=strutil.TOKENIZER(Event.Details, "\n")
+str=toks:next()
+while str~=nil
+do
+	str=strutil.trim(str)
+	if str=="Or call in (audio only)" 
+	then 
+		Event.URL=Event.URL.."  DialIn:["..strutil.trim(toks:next()).."]"
+		break
+	end 
+
+	str=toks:next()
+end
+
+--[[
+ Microsoft Teams meeting \nJoin on your computer or mobile app \nClick here to
+  join the meeting \nOr call in (audio only) \n+44 20 3321 5273\,\,13589282
+ 3#   United Kingdom\, London \nPhone Conference ID: 135 892 823# \nFind a
+  local number | Reset PIN \nLearn More | Meeting options 
+]]--
+end
+
+function ICalPostProcess(Event)
+
+if Event.Location=="LoopUp" then ICalPostProcessLoopUp(Event)
+elseif string.find(Event.Details, "Microsoft Teams meeting") ~= nil then ICalPostProcessMSTeams(Event)
 end
 
 end
@@ -765,7 +795,7 @@ if S ~= nil
 then
 str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
 str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
-str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. string.gsub(event.Details, "\n", "\\n") .."\""
+str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
 if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
 S:writeln(str.."\n")
 S:close()
