@@ -1452,10 +1452,86 @@ local val
 end
 
 
+function ParseCommandLineArg(arg, i,  args, NewEvent, Config)
+
+if arg=="-debug" then Config.debug=true
+elseif arg=="-h" or arg=="-hour"  then Config.EventsEnd=Config.EventsStart + 3600 * ParseNumericArg(args,i)
+elseif arg=="-d" or arg=="-day" or arg=="-days" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * ParseNumericArg(args,i)
+elseif arg=="-w" or arg=="-week" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
+elseif arg=="-m" or arg=="-month" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
+elseif arg=="-y" or arg=="-year" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
+elseif arg=="-detail" or arg=="-details" or arg=="-v" then Settings.ShowDetail=true
+elseif arg=="-show-url" then Settings.ShowURL=true
+elseif arg=="-add" 
+then 
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
+elseif arg=="-addpub" 
+then 
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
+	NewEvent.Visibility="public"
+elseif arg=="-addpriv"
+then
+	Config.action="add"
+	NewEvent.Title=ParseArg(args, i+1)
+	NewEvent.Visibility="private"
+elseif arg=="-start" or arg=="-s"
+then
+	--do nothing! this is handled by the earlier loop
+elseif arg=="-end"
+then
+	Config.EventsEnd=ParseDate(ParseArg(args, i+1))
+elseif arg=="-maxlen"
+then
+	Settings.EventMaxLength=ParseDuration(ParseArg(args, i+1))
+elseif arg=="-at" or arg=="-where" or arg=="-location" then NewEvent.Location=ParseArg(args, i+1)
+elseif arg=="-import"
+then
+	Config.action="import"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-email" or arg=="-import-email"
+then
+	Config.action="import-email"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-convert"
+then
+	Config.action="convert"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-email" or arg=="-convert-email"
+then
+	Config.action="convert-email"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-xt" or arg=="-xterm-title" or arg=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
+elseif arg=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
+elseif arg=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
+elseif arg=="-hide"
+then
+	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections.. ",!" ..ParseArg(args,i+1) else Config.selections="!"..ParseArg(args, i+1) end
+elseif arg=="-show"
+then
+	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
+elseif arg=="-old" then Config.EventsStart=0
+elseif arg=="-persist" then Settings.Persist=true 
+elseif arg=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
+elseif arg=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
+elseif arg=="-of" then Settings.OutputFormat=ParseArg(args, i+1) 
+elseif arg=="-u" or arg=="-unicode" then  terminal.unicodelvl(1)
+elseif arg=="-u2" or arg=="-unicode2" then  terminal.unicodelvl(2)
+elseif arg=="-u3" or arg=="-unicode3" then  terminal.unicodelvl(3)
+elseif arg=="-?" or arg=="-h" or arg=="-help" or arg=="--help"
+then
+	Config.action="help"
+else
+	if strutil.strlen(v) > 0 then Config.calendars=Config.calendars..","..v end
+end
+
+end
+
 
 -- Parse command line arguments. The 'add event' functionality is called directly from with this function if -add is encounted on the command line
 function ParseCommandLine(args)
-local i, v, val
+local i, arg, val
 local action="none"
 local calendars=""
 local selections=""
@@ -1473,91 +1549,26 @@ NewEvent=EventCreate()
 NewEvent.Visibility="default"
 
 --as other values are set relative to Config.EventsStart, so we have to grab any '-start' option before all others
-for i,v in ipairs(args)
+for i,arg in ipairs(args)
 do
-if v=="-s" or v=="-start" then Config.EventsStart=ParseDate(ParseArg(args, i+1)) end
+if arg=="-s" or arg=="-start" then Config.EargentsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
 if Config.EventsStart==0 then Config.EventsStart=time.secs() end
 
-for i,v in ipairs(args)
+for i,arg in ipairs(args)
 do
-
-if v=="-debug" then Config.debug=true
-elseif v=="-h" or v=="-hour"  then Config.EventsEnd=Config.EventsStart + 3600 * ParseNumericArg(args,i)
-elseif v=="-d" or v=="-day" or v=="-days" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * ParseNumericArg(args,i)
-elseif v=="-w" or v=="-week" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
-elseif v=="-m" or v=="-month" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
-elseif v=="-y" or v=="-year" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
-elseif v=="-detail" or v=="-details" or v=="-v" then Settings.ShowDetail=true
-elseif v=="-show-url" then Settings.ShowURL=true
-elseif v=="-add" 
-then 
-	Config.action="add"
-	NewEvent.Title=ParseArg(args, i+1)
-elseif v=="-addpub" 
-then 
-	Config.action="add"
-	NewEvent.Title=ParseArg(args, i+1)
-	NewEvent.Visibility="public"
-elseif v=="-addpriv"
-then
-	Config.action="add"
-	NewEvent.Title=ParseArg(args, i+1)
-	NewEvent.Visibility="private"
-elseif v=="-start" or v=="-s"
-then
-	--do nothing! this is handled by the earlier loop
-elseif v=="-end"
-then
-	Config.EventsEnd=ParseDate(ParseArg(args, i+1))
-elseif v=="-maxlen"
-then
-	Settings.EventMaxLength=ParseDuration(ParseArg(args, i+1))
-elseif v=="-at" or v=="-where" or v=="-location" then NewEvent.Location=ParseArg(args, i+1)
-elseif v=="-import"
-then
-	Config.action="import"
-	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
-elseif v=="-email" or v=="-import-email"
-then
-	Config.action="import-email"
-	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
-elseif v=="-convert"
-then
-	Config.action="convert"
-	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
-elseif v=="-email" or v=="-convert-email"
-then
-	Config.action="convert-email"
-	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
-elseif v=="-xt" or v=="-xterm-title" or v=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
-elseif v=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
-elseif v=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
-elseif v=="-hide"
-then
-	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections.. ",!" ..ParseArg(args,i+1) else Config.selections="!"..ParseArg(args, i+1) end
-elseif v=="-show"
-then
-	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
-elseif v=="-old" then Config.EventsStart=0
-elseif v=="-persist" then Settings.Persist=true 
-elseif v=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
-elseif v=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
-elseif v=="-of" then Settings.OutputFormat=ParseArg(args, i+1) 
-elseif v=="-u" or v=="-unicode" then  terminal.unicodelvl(1)
-elseif v=="-u2" or v=="-unicode2" then  terminal.unicodelvl(2)
-elseif v=="-u3" or v=="-unicode3" then  terminal.unicodelvl(3)
-elseif v=="-?" or v=="-h" or v=="-help" or v=="--help"
-then
-	Config.action="help"
-else
-	if strutil.strlen(v) > 0 then Config.calendars=Config.calendars..","..v end
-end
-
+ ParseCommandLineArg(arg, i, args, NewEvent, Config)
 end
 
 if strutil.strlen(Config.calendars)==0 then Config.calendars="a:default" end
+
+if Config.EventsStart > Config.EventsEnd
+then
+val=Config.EventsStart
+Config.EventsStart=Config.EventsEnd
+Config.EventsEnd=val
+end
 
 if strutil.strlen(NewEvent.Title) > 0
 then
