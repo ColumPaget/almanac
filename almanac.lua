@@ -116,6 +116,7 @@ values["monthname"]=time.formatsecs("%B", event.Start)
 values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
+values["status"]=event.Status
 
 if values["date"]==Today 
 then 
@@ -739,27 +740,45 @@ end
 
 --FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
 
+function AlmanacParseCalendarLine(line)
+local event, toks
+
+event=EventCreate()
+toks=strutil.TOKENIZER(line, "\\S", "Q")
+event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.UID=toks:next()
+event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.Title=toks:next()
+event.Location=toks:next()
+event.Details=strutil.unQuote(toks:next())
+event.URL=strutil.unQuote(toks:next())
+event.Status=""
+
+return event
+end
+
+
 function AlmanacLoadCalendar(Collated, cal)
-local S, str, event, toks, when
+local S, str, event, old_event, toks, when
 local tmpTable={}
 
 str=process.getenv("HOME") .. time.format("/.almanac/%b-%Y.cal")
+
 S=stream.STREAM(str)
 if S ~= nil
 then
 str=S:readln()
 while str ~= nil
 do
-	event=EventCreate()
-	toks=strutil.TOKENIZER(str, "\\S", "Q")
-	event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-	event.UID=toks:next()
-	event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-	event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-	event.Title=toks:next()
-	event.Location=toks:next()
-	event.Details=strutil.unQuote(toks:next())
-	event.URL=strutil.unQuote(toks:next())
+	event=AlmanacParseCalendarLine(str)
+	old_event=tmpTable[event.UID]
+	if old_event ~= nil
+	then
+	old_event.Status="moved"
+	tmpTable[old_event.UID.."-moved"]=old_event
+	end
+
 	tmpTable[event.UID]=event
 	str=S:readln()
 end
@@ -1307,9 +1326,9 @@ print()
 print("options:")
 print("   -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -d <n>      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -day  <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -days <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -d <n>      show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -day  <n>   show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -days <n>   show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
 print("   -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
 print("   -m <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed")
@@ -1473,6 +1492,7 @@ function ParseNumericArg(args, i)
 local val
 
 	val=tonumber(args[i+1])
+
 	if val == nil then 
 	val=1 
 	else args[i+1]=""
@@ -1483,10 +1503,11 @@ end
 
 
 function ParseCommandLineArg(arg, i,  args, NewEvent, Config)
+local val
 
 if arg=="-debug" then Config.debug=true
 elseif arg=="-h" or arg=="-hour"  then Config.EventsEnd=Config.EventsStart + 3600 * ParseNumericArg(args,i)
-elseif arg=="-d" or arg=="-day" or arg=="-days" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * ParseNumericArg(args,i)
+elseif arg=="-d" or arg=="-day" or arg=="-days" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * ParseNumericArg(args, i)
 elseif arg=="-w" or arg=="-week" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * ParseNumericArg(args,i)
 elseif arg=="-m" or arg=="-month" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 7 * 4 * ParseNumericArg(args,i)
 elseif arg=="-y" or arg=="-year" then Config.EventsEnd=Config.EventsStart + 3600 * 24 * 365 * ParseNumericArg(args,i)
@@ -1599,6 +1620,7 @@ val=Config.EventsStart
 Config.EventsStart=Config.EventsEnd
 Config.EventsEnd=val
 end
+
 
 if strutil.strlen(NewEvent.Title) > 0
 then
@@ -1845,7 +1867,7 @@ Settings.XtermTitle="$(dayname) $(day) $(monthname)"
 Settings.RefreshTime=ParseDuration("2m")
 
 -- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~m$(title)~0 $(location)"
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~r$(status)~0 ~m$(title)~0 $(location)"
 
 -- When importing from calendars that have long events, or events with open or misconfigured lengths, 
 -- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit
