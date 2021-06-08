@@ -1602,10 +1602,11 @@ NewEvent.Visibility="default"
 --as other values are set relative to Config.EventsStart, so we have to grab any '-start' option before all others
 for i,arg in ipairs(args)
 do
-if arg=="-s" or arg=="-start" then Config.EargentsStart=ParseDate(ParseArg(args, i+1)) end
+if arg=="-s" or arg=="-start" then Config.EventsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
 if Config.EventsStart==0 then Config.EventsStart=time.secs() end
+
 
 for i,arg in ipairs(args)
 do
@@ -1614,24 +1615,23 @@ end
 
 if strutil.strlen(Config.calendars)==0 then Config.calendars="a:default" end
 
-if Config.EventsStart > Config.EventsEnd
-then
-val=Config.EventsStart
-Config.EventsStart=Config.EventsEnd
-Config.EventsEnd=val
-end
 
-
-if strutil.strlen(NewEvent.Title) > 0
+if Config.EventsEnd > 0
 then
-	NewEvent.Start=Config.EventsStart
-	if Config.EventsEnd > 0 
-	then 
-		NewEvent.End=Config.EventsEnd
-	else
-		NewEvent.End=Config.EventsStart
+	if Config.EventsStart > Config.EventsEnd
+	then
+	val=Config.EventsStart
+	Config.EventsStart=Config.EventsEnd
+	Config.EventsEnd=val
 	end
+
+	NewEvent.End=Config.EventsEnd
+else
+	NewEvent.End=Config.EventsStart
 end
+
+NewEvent.Start=Config.EventsStart
+NewEvent.End=Config.EventsEnd
 
 return Config, NewEvent
 end
