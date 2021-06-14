@@ -1624,10 +1624,8 @@ then
 	Config.EventsStart=Config.EventsEnd
 	Config.EventsEnd=val
 	end
-
-	NewEvent.End=Config.EventsEnd
 else
-	NewEvent.End=Config.EventsStart
+	Config.EventsEnd=Config.EventsStart + 3600
 end
 
 NewEvent.Start=Config.EventsStart
