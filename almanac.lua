@@ -512,8 +512,8 @@ do
 end
 
 ICalPostProcess(Event)
-
 table.insert(Events, Event)
+
 end
 
 
@@ -1208,7 +1208,7 @@ do
 		pattern=string.sub(pattern, 2)
 	end
 
-	if strutil.pmatch(pattern, event.Title) > 0 
+	if strutil.pmatch(pattern, event.Title) == false 
 	then 
 		if invert then result=false
 		else result=true end
@@ -1331,10 +1331,10 @@ print("   -day  <n>   show events for the next 'n' days.  The 'n' argument is op
 print("   -days <n>   show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
 print("   -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
-print("   -m <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed")
-print("   -month <n>  show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed")
-print("   -y <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed")
-print("   -year <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed")
+print("   -m <n>      show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
+print("   -month <n>  show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
+print("   -y <n>      show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
+print("   -year <n>   show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
 print("   -at <loc>   show events at location 'loc'")
 print("   -where <loc>     show events at location 'loc'")
 print("   -location <loc>  show events at location 'loc'")
@@ -1656,7 +1656,8 @@ end
 
 
 function ConvertItems(action, items)
-local toks, url, Events={}
+local toks, url
+local Events={}
 
 toks=strutil.TOKENIZER(items, "\n")
 url=toks:next()
