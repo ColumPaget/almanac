@@ -30,157 +30,6 @@ Tomorrow=time.formatsecs("%Y/%m/%d", Now+3600*24)
 end
 
 
-
-function DocumentGetType(S)
-local Tokens, str, ext
-local doctype=""
-
-str=S:getvalue("HTTP:Content-Type")
-if strutil.strlen(str) ~= 0
-then
-	Tokens=strutil.TOKENIZER(str, ";")
-	doctype=Tokens:next()
-
-	if doctype=="application/ical" then ext=".ical" 
-	elseif doctype=="application/rss" then ext=".rss"
-	elseif doctype=="text/calendar" 
-	then 
-		ext=".ical"
-		doctype="application/ical"
-	end
-else
-	str=S:path()
-	if strutil.strlen(str) ~= nil
-	then
-		ext=filesys.extn(filesys.basename(str))
-		if ext==".ical" then doctype="application/ical" 
-		elseif ext==".rss" then doctype="application/rss" 
-		end
-	end
-end
-
-return doctype, ext
-end 
-
-
-
-
-function OpenCachedDocument(url)
-local str, dochash, doctype, extn, S
-local extns={".ical", ".rss"}
-
-dochash=hash.hashstr(url, "md5", "hex")
-
-if filesys.exists(url) == true then return(stream.STREAM(url, "r")) end
-
-for i,extn in ipairs(extns)
-do
-str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
-if filesys.exists(str) == true and (time.secs() - filesys.mtime(str)) < Settings.CacheTime then return(stream.STREAM(str, "r")) end
-end
-
-S=stream.STREAM(url)
-if S ~= nil
-then
-	doctype,extn=DocumentGetType(S)
-	S:close()
-	if extn==nil then extn="" end
-	str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
-	filesys.copy(url, str)
-	return(stream.STREAM(str, "r"))
-end
-
-return nil
-end
-
-
-
-
---this function substitutes named values like '$(day)' with their actual data
-function SubstituteEventStrings(format, event)
-local toks, str, diff 
-local values={}
-local output=""
-
-if event.Start==nil then return "" end
-
-values["date"]=time.formatsecs("%Y/%m/%d", event.Start)
-values["time"]=time.formatsecs("%H:%M:%S", event.Start)
-values["day"]=time.formatsecs("%d", event.Start)
-values["month"]=time.formatsecs("%m", event.Start)
-values["Year"]=time.formatsecs("%Y", event.Start)
-values["year"]=time.formatsecs("%y", event.Start)
-values["dayname"]=time.formatsecs("%A", event.Start)
-values["daynick"]=time.formatsecs("%a", event.Start)
-values["monthname"]=time.formatsecs("%B", event.Start)
-values["monthnick"]=time.formatsecs("%b", event.Start)
-values["location"]=event.Location
-values["title"]=event.Title
-values["status"]=event.Status
-
-if values["date"]==Today 
-then 
-	values["dayid"]="Today"
-	values["dayid_color"]="~r~eToday~0"
-	values["daynick_color"]=time.formatsecs("~r~e%a~0", event.Start)
-elseif values["date"]==Tomorrow
-then 
-	values["dayid"]="Tomorrow"
-	values["dayid_color"]="~y~eTomorrow~0"
-	values["daynick_color"]=time.formatsecs("~y~e%a~0", event.Start)
-elseif event.Start < Now
-then
-	values["dayid"]=time.formatsecs("%A", event.Start)
-	values["dayid_color"]=time.formatsecs("~R~n%a~0", event.Start)
-	values["daynick_color"]=time.formatsecs("~R~n%a~0", event.Start)
-else
-	values["dayid"]=time.formatsecs("%A", event.Start)
-	values["dayid_color"]=time.formatsecs("%a", event.Start)
-	values["daynick_color"]=time.formatsecs("%a", event.Start)
-end
-
-
-diff=event.Start - Now
-if diff < 0 then str="~R~b"
-elseif diff < (10 * 60)  then str="~r"
-elseif diff < (30 * 60) then str="~m"
-elseif diff < (60 * 60) then str="~g"
-else str=""
-end
-
-values["time_color"]=str ..time.formatsecs("%H:%M:%S", event.Start).."~0"
-
-diff=event.End - event.Start
-if diff < 0
-then
-	values["duration"]="??????"
-elseif diff < 3600
-then
-	values["duration"]=string.format("%dmins", diff / 60)
-else
-	values["duration"]=time.formatsecs("%Hh%Mm", diff)
-end
-
-toks=strutil.TOKENIZER(format, "$(|)", "ms")
-str=toks:next()
-while str ~= nil
-do
-  if str=="$("
-  then
-    str=toks:next()
-    if values[str] ~= nil then output=output .. values[str] end
-  elseif strutil.strlen(str) and str ~= ")"
-  then
-    output=output..str
-  end
-  str=toks:next()
-end
-
-return output
-end
-
-
-
 --this function builds a single line from file formats (email headers and ical) that set limits on line length.
 --these formats split long lines and start the continuation lines with a whitespace to indicate it's a
 --continuation of the previousline
@@ -224,6 +73,7 @@ end
 
 return count
 end
+
 
 
 function ParseDuration(str)
@@ -334,29 +184,6 @@ end
 end
 
 
-
-
--- create a blank event object
-function EventCreate()
-local Event={}
-
-Event.Attendees=0
-Event.UTCoffset=0;
-Event.UID=string.format("%x",time.secs())
-Event.Title=""
-Event.Details=""
-Event.Status=""
-Event.Location=""
-Event.Details=""
-Event.Visibility=""
-Event.Start=0
-Event.End=0
-Event.URL=""
-
-return Event
-end
-
-
 -- do initial oauth authentication
 function OAuthGet(OA)
 
@@ -373,6 +200,33 @@ OA:listen(8989, "https://www.googleapis.com/oauth2/v4/token");
 OA:save("");
 print()
 end
+
+
+function OutputCSVHeader(Out)
+Out:writeln("Start,End,Title,Location,Attendees,Status\n")
+end
+
+
+function OutputCSVTrailer(Out)
+end
+
+
+
+function OutputEventCSV(Out, event)
+local str, date
+
+str=time.formatsecs("%a,%Y/%m/%d %H:%M,", event.Start) .. " - "  
+if event.End > 0 
+then 
+	str=str .. time.formatsecs("%H:%M,", event.End) 
+else 
+	str=str.. "?,"
+end
+
+str="\"" .. event.Title .. "\", \"" .. event.Location .. "\", \""..event.Attendees.."\", \""..event.Status.."\"\n"
+Out:writeln(str)
+end
+
 
 
 -- FUNCTIONS FOR PARSING ICAL FILES
@@ -534,6 +388,41 @@ end
 
 
 
+-- These functions output calendar in standard ICAL calendar format
+function OutputICALHeader(Out)
+Out:writeln("BEGIN:VCALENDAR\n")
+end
+
+function OutputICALTrailer(Out)
+Out:writeln("END:VCALENDAR\n")
+end
+
+
+function OutputEventICAL(Out, event)
+local str, date
+
+Out:writeln("BEGIN:VEVENT\n")
+Out:writeln("SUMMARY:"..event.Title.."\n")
+Out:writeln("DESCRIPTION:"..event.Details.."\n")
+Out:writeln("LOCATION:"..event.Location.."\n")
+Out:writeln("DTSTART:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start).."\n")
+
+if event.End > 0
+then 
+	diff=event.End-event.Start
+	if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength
+	then 
+		Out:writeln("DTEND:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start + Settings.MaxEventLength).."\n") 
+	else
+		Out:writeln("DTEND:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.End).."\n") 
+	end
+end
+
+Out:writeln("END:VEVENT".."\n")
+end
+
+
+
 -- FUNCTIONS FOR PARSING RSS and XCal FILES
 
 function RSSParseEvent(Parser)
@@ -579,284 +468,6 @@ end
 
 end
 
-
-
-
-
-
--- FUNCTIONS RELATING TO GOOGLE CALENDAR
-function GCalAddEvent(calendars, NewEvent)
-local url, S, text, doc, cal, Tokens
-
-if OA==nil
-then
-	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
-	if OA:load() == 0 then OAuthGet(OA) end
-
-end
-
-
-Tokens=strutil.TOKENIZER(calendars,",")
-cal=Tokens:next()
-while cal ~= nil
-do
-cal=string.sub(cal,3)
-if strutil.strlen(cal) > 0
-then
-url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events"
-text="{\n\"summary\": \"" .. strutil.quoteChars(NewEvent.Title, "\n\"") .. "\",\n"
-if strutil.strlen(NewEvent.Location) > 0 then text=text.."\"location\": \"".. strutil.quoteChars(NewEvent.Location, "\n\"") .."\",\n" end
-if strutil.strlen(NewEvent.Details) > 0 then text=text.."\"description\": \"".. strutil.quoteChars(NewEvent.Details, "\n\"") .."\",\n" end
-if strutil.strlen(NewEvent.Visibility) > 0 then text=text.."\"visibility\": \"".. NewEvent.Visibility .."\",\n" end
-text=text.."\"start\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.Start,"GMT") .. "\"\n},\n"
-text=text.."\"end\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.End,"GMT") .. "\"\n}\n"
-text=text.. "}"
-S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. strutil.strlen(text))
-
-S:writeln(text)
-doc=S:readdoc()
-S:close()
-end
-
-cal=Tokens:next()
-end
-
-end
-
-
-
-
-function GCalParseEvent(Parser)
-local Event
-local Start, End
-
-Event=EventCreate()
-Event.Title=Parser:value("summary")
-Event.Details=Parser:value("description")
-LocationParse(Event, Parser:value("location"))
-Start=Parser:value("start/dateTime")
-if strutil.strlen(Start) == 0 then Start=Parser:value("start/date") .. "T00:00:00" end
-End=Parser:value("end/dateTime")
-if strutil.strlen(End) == 0 then End=Parser:value("start/date") .. "T00:00:00" end
-Event.Attendees=0
-Event.Status=Parser:value("status")
-
---"2012-04-26T21:00:00+01:00",
-Event.Start=time.tosecs("%Y-%m-%dT%H:%M:%S", Start)
-Event.End=time.tosecs("%Y-%m-%dT%H:%M:%S", End)
-
-return Event
-end
-
-
-
-
-function GCalLoadCalendar(Collated, cal)
-local S, P, Events, Item, doc, url
-
-if OA==nil
-then
-	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
-	if OA:load() == false then OAuthGet(OA) end
-end
-
-url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events?singleEvents=true"
-if config.EventsStart > 0
-then 
-	url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", config.EventsStart))
-end
-
-S=stream.STREAM(url,"oauth="..OA:name())
-doc=S:readdoc()
-
-P=dataparser.PARSER("json", doc)
-Events=P:open("/items")
-if Events ~= nil
-then
-Item=Events:next()
-while Item ~= nil
-do
-	if Item:value("kind")=="calendar#event" then table.insert(Collated, GCalParseEvent(Item)) end
-	Item=Events:next()
-end
-end
-
-S:close()
-end
-
-
-
-
--- FUNCTIONS RELATING TO MEETUP CALENDARS
-function MeetupParseEvent(Parser)
-local Event={}
-
-Event=EventCreate()
-Event.Title=Parser:value("name")
-Event.Details=Parser:value("description")
-Event.Location=Parser:value("venue/name");
-if Event.Location==nil then Event.Location="" end
-Event.Country=Parser:value("venue/country");
-Event.City=Parser:value("venue/city");
---Event.Start=Parser:value("local_date").." "..Parser:value("local_time")
-Event.Attendees=tonumber(Parser:value("yes_rsvp_count"))
-Event.UTCoffset=tonumber(Parser:value("utc_offset"));
-
--- convert from time in millseconds
-Event.Start=tonumber(Parser:value("time")) / 1000.0
-if strutil.strlen(Parser:value("duration"))  > 0
-then
-Event.End=Event.Start + tonumber(Parser:value("duration")) / 1000.0
-else Event.End=0
-end
-
-return Event
-end
-
-
-
-function MeetupLoadCalendar(Collated, cal)
-local S, P, Events, Item, doc
-
-S=stream.STREAM("https://api.meetup.com/".. strutil.httpQuote(cal) .."/events")
-doc=S:readdoc()
-
-P=dataparser.PARSER("json", doc)
-Events=P:open("/")
-if Events ~= nil
-then
-Item=Events:next()
-while Item ~= nil
-do
-table.insert(Collated, MeetupParseEvent(Item))
-Item=Events:next()
-end
-end
-
-S:close()
-end
-
-
-
---FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
-
-function AlmanacParseCalendarLine(line)
-local event, toks
-
-event=EventCreate()
-toks=strutil.TOKENIZER(line, "\\S", "Q")
-event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.UID=toks:next()
-event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.Title=toks:next()
-event.Location=toks:next()
-event.Details=strutil.unQuote(toks:next())
-event.URL=strutil.unQuote(toks:next())
-event.Status=""
-
-return event
-end
-
-
-function AlmanacLoadCalendar(Collated, cal)
-local S, str, event, old_event, toks, when
-local tmpTable={}
-
-str=process.getenv("HOME") .. time.format("/.almanac/%b-%Y.cal")
-
-S=stream.STREAM(str)
-if S ~= nil
-then
-str=S:readln()
-while str ~= nil
-do
-	event=AlmanacParseCalendarLine(str)
-	old_event=tmpTable[event.UID]
-	if old_event ~= nil
-	then
-	old_event.Status="moved"
-	tmpTable[old_event.UID.."-moved"]=old_event
-	end
-
-	tmpTable[event.UID]=event
-	str=S:readln()
-end
-S:close()
-end
-
-
-for key,event in pairs(tmpTable)
-do
-	when=Settings.WarnTime
-	if Settings.WarnRaisedTime > Settings.WarnTime then when=Settings.WarnRaisedTime end
-	if when > 0 and (Now - event.Start) < when
-	then
-		table.insert(WarnEvents, event)
-	end
-
-	table.insert(Collated, event)
-end
-
-end
-
-
-
-function AlmanacAddEvent(event)
-local S, str
-
-str=process.getenv("HOME") .. "/.almanac/"
-filesys.mkdir(str)
-
-str=str..time.formatsecs("%b-%Y.cal", event.Start)
-S=stream.STREAM(str, "a")
-if S ~= nil
-then
-str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
-str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
-str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
-if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
-S:writeln(str.."\n")
-S:close()
-end
-end
-
-
-
-
-
-function DocumentLoadEvents(Events, url)
-local S, doctype, doc
-
-S=OpenCachedDocument(url);
-if S ~= nil
-then
-	doctype=DocumentGetType(S)
-	doc=S:readdoc()
-	if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml" 
-	then 
-		RSSLoadEvents(Events, doc)
-	else
-		ICalLoadEvents(Events, doc)
-	end
-else
-print(terminal.format("~rerror: cannot open '"..url.."'~0"))
-end
-
-end
-
-
-
-function ImportEventsToCalendar(url, calendars)
-local Events={}
-
-DocumentLoadEvents(Events, url)
-for i,event in ipairs(Events)
-do
-GCalAddEvent(calendars, event)
-AlmanacAddEvent(event)
-end
-end
 
 
 
@@ -1031,100 +642,430 @@ end
 end
 
 
--- These functions output calendar in standard ICAL calendar format
-function OutputICALHeader(Out)
-Out:writeln("BEGIN:VCALENDAR\n")
-end
+function DocumentGetType(S)
+local Tokens, str, ext
+local doctype=""
 
-function OutputICALTrailer(Out)
-Out:writeln("END:VCALENDAR\n")
-end
+str=S:getvalue("HTTP:Content-Type")
+if strutil.strlen(str) ~= 0
+then
+	Tokens=strutil.TOKENIZER(str, ";")
+	doctype=Tokens:next()
 
-
-function OutputEventICAL(Out, event)
-local str, date
-
-Out:writeln("BEGIN:VEVENT\n")
-Out:writeln("SUMMARY:"..event.Title.."\n")
-Out:writeln("DESCRIPTION:"..event.Details.."\n")
-Out:writeln("LOCATION:"..event.Location.."\n")
-Out:writeln("DTSTART:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start).."\n")
-
-if event.End > 0
-then 
-	diff=event.End-event.Start
-	if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength
+	if doctype=="application/ical" then ext=".ical" 
+	elseif doctype=="application/rss" then ext=".rss"
+	elseif doctype=="text/calendar" 
 	then 
-		Out:writeln("DTEND:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.Start + Settings.MaxEventLength).."\n") 
-	else
-		Out:writeln("DTEND:"..time.formatsecs("%Y%m%dT%H%M%SZ", event.End).."\n") 
+		ext=".ical"
+		doctype="application/ical"
+	end
+else
+	str=S:path()
+	if strutil.strlen(str) ~= nil
+	then
+		ext=filesys.extn(filesys.basename(str))
+		if ext==".ical" then doctype="application/ical" 
+		elseif ext==".rss" then doctype="application/rss" 
+		end
 	end
 end
 
-Out:writeln("END:VEVENT".."\n")
+return doctype, ext
+end 
+
+
+
+
+function OpenCachedDocument(url)
+local str, dochash, doctype, extn, S
+local extns={".ical", ".rss"}
+
+dochash=hash.hashstr(url, "md5", "hex")
+
+if filesys.exists(url) == true then return(stream.STREAM(url, "r")) end
+
+for i,extn in ipairs(extns)
+do
+str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
+if filesys.exists(str) == true and (time.secs() - filesys.mtime(str)) < Settings.CacheTime then return(stream.STREAM(str, "r")) end
+end
+
+S=stream.STREAM(url)
+if S ~= nil
+then
+	doctype,extn=DocumentGetType(S)
+	S:close()
+	if extn==nil then extn="" end
+	str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
+	filesys.copy(url, str)
+	return(stream.STREAM(str, "r"))
+end
+
+return nil
+end
+
+
+function DocumentLoadEvents(Events, url)
+local S, doctype, doc
+
+S=OpenCachedDocument(url);
+if S ~= nil
+then
+        doctype=DocumentGetType(S)
+        doc=S:readdoc()
+        if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml"
+        then
+                RSSLoadEvents(Events, doc)
+        else
+                ICalLoadEvents(Events, doc)
+        end
+else
+print(terminal.format("~rerror: cannot open '"..url.."'~0"))
+end
+
 end
 
 
 
--- These functions output calendars in the format for Sanjay Ghemawat's 'ical' program,
--- https://en.wikipedia.org/wiki/Ical_%28Unix%29
--- which is nothing to do with Apple's 'ical' format
+-- FUNCTIONS RELATING TO GOOGLE CALENDAR
+function GCalAddEvent(calendars, NewEvent)
+local url, S, text, doc, cal, Tokens
 
-function OutputSGIcalHeader(Out)
-Out:writeln("Calendar [v2.0]\n")
-end
+if OA==nil
+then
+	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	if OA:load() == 0 then OAuthGet(OA) end
 
-function OutputSGIcalTrailer(Out)
-end
-
-function OutputEventSGIcal(Out, event)
-local str, date
-
-Out:writeln("Appt [\n")
-start_str=time.formatsecs("%Y%m%dT000000", event.Start)
-diff=event.Start - time.tosecs("%Y%m%dT%H%M%S", start_str)
-Out:writeln(string.format("Start [%d]\n", diff / 60))
-
-diff=(event.End - event.Start)
-if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength then diff=Settings.MaxEventLength end
-Out:writeln(string.format("Length [%d]\n", diff / 60))
-Out:writeln("Uid ["..event.UID.."]\n")
-str="Contents [" .. event.Title
-if strutil.strlen(event.Location) > 0 then str=str.. "\nAt: " .. event.Location end
-if strutil.strlen(event.Description) > 0 then str=str.. "\n" .. event.Description end
-str=str.."]\n"
-Out:writeln(str)
-Out:writeln("Remind [1]\n");
-Out:writeln("Hilite [1]\n");
-Out:writeln(time.formatsecs("Dates [Single %d/%m/%Y End ]\n", event.Start));
-Out:writeln("]\n");
 end
 
 
+Tokens=strutil.TOKENIZER(calendars,",")
+cal=Tokens:next()
+while cal ~= nil
+do
+cal=string.sub(cal,3)
+if strutil.strlen(cal) > 0
+then
+url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events"
+text="{\n\"summary\": \"" .. strutil.quoteChars(NewEvent.Title, "\n\"") .. "\",\n"
+if strutil.strlen(NewEvent.Location) > 0 then text=text.."\"location\": \"".. strutil.quoteChars(NewEvent.Location, "\n\"") .."\",\n" end
+if strutil.strlen(NewEvent.Details) > 0 then text=text.."\"description\": \"".. strutil.quoteChars(NewEvent.Details, "\n\"") .."\",\n" end
+if strutil.strlen(NewEvent.Visibility) > 0 then text=text.."\"visibility\": \"".. NewEvent.Visibility .."\",\n" end
+text=text.."\"start\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.Start,"GMT") .. "\"\n},\n"
+text=text.."\"end\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.End,"GMT") .. "\"\n}\n"
+text=text.. "}"
+S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. strutil.strlen(text))
 
-function OutputCSVHeader(Out)
-Out:writeln("Start,End,Title,Location,Attendees,Status\n")
+S:writeln(text)
+doc=S:readdoc()
+S:close()
 end
 
+cal=Tokens:next()
+end
 
-function OutputCSVTrailer(Out)
 end
 
 
 
-function OutputEventCSV(Out, event)
-local str, date
 
-str=time.formatsecs("%a,%Y/%m/%d %H:%M,", event.Start) .. " - "  
-if event.End > 0 
+function GCalParseEvent(Parser)
+local Event
+local Start, End
+
+Event=EventCreate()
+Event.Title=Parser:value("summary")
+Event.Details=Parser:value("description")
+LocationParse(Event, Parser:value("location"))
+Start=Parser:value("start/dateTime")
+if strutil.strlen(Start) == 0 then Start=Parser:value("start/date") .. "T00:00:00" end
+End=Parser:value("end/dateTime")
+if strutil.strlen(End) == 0 then End=Parser:value("start/date") .. "T00:00:00" end
+Event.Attendees=0
+Event.Status=Parser:value("status")
+
+--"2012-04-26T21:00:00+01:00",
+Event.Start=time.tosecs("%Y-%m-%dT%H:%M:%S", Start)
+Event.End=time.tosecs("%Y-%m-%dT%H:%M:%S", End)
+
+return Event
+end
+
+
+
+
+function GCalLoadCalendar(Collated, cal)
+local S, P, Events, Item, doc, url
+
+if OA==nil
+then
+	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	if OA:load() == false then OAuthGet(OA) end
+end
+
+url="https://www.googleapis.com/calendar/v3/calendars/".. strutil.httpQuote(cal) .."/events?singleEvents=true"
+if config.EventsStart > 0
 then 
-	str=str .. time.formatsecs("%H:%M,", event.End) 
-else 
-	str=str.. "?,"
+	url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", config.EventsStart))
 end
 
-str="\"" .. event.Title .. "\", \"" .. event.Location .. "\", \""..event.Attendees.."\", \""..event.Status.."\"\n"
-Out:writeln(str)
+S=stream.STREAM(url,"oauth="..OA:name())
+doc=S:readdoc()
+
+P=dataparser.PARSER("json", doc)
+Events=P:open("/items")
+if Events ~= nil
+then
+Item=Events:next()
+while Item ~= nil
+do
+	if Item:value("kind")=="calendar#event" then table.insert(Collated, GCalParseEvent(Item)) end
+	Item=Events:next()
+end
+end
+
+S:close()
+end
+
+
+
+
+
+-- FUNCTIONS RELATING TO MEETUP CALENDARS
+function MeetupParseEvent(Parser)
+local Event={}
+
+Event=EventCreate()
+Event.Title=Parser:value("name")
+Event.Details=Parser:value("description")
+Event.Location=Parser:value("venue/name");
+if Event.Location==nil then Event.Location="" end
+Event.Country=Parser:value("venue/country");
+Event.City=Parser:value("venue/city");
+--Event.Start=Parser:value("local_date").." "..Parser:value("local_time")
+Event.Attendees=tonumber(Parser:value("yes_rsvp_count"))
+Event.UTCoffset=tonumber(Parser:value("utc_offset"));
+
+-- convert from time in millseconds
+Event.Start=tonumber(Parser:value("time")) / 1000.0
+if strutil.strlen(Parser:value("duration"))  > 0
+then
+Event.End=Event.Start + tonumber(Parser:value("duration")) / 1000.0
+else Event.End=0
+end
+
+return Event
+end
+
+
+
+function MeetupLoadCalendar(Collated, cal)
+local S, P, Events, Item, doc
+
+S=stream.STREAM("https://api.meetup.com/".. strutil.httpQuote(cal) .."/events")
+doc=S:readdoc()
+
+P=dataparser.PARSER("json", doc)
+Events=P:open("/")
+if Events ~= nil
+then
+Item=Events:next()
+while Item ~= nil
+do
+table.insert(Collated, MeetupParseEvent(Item))
+Item=Events:next()
+end
+end
+
+S:close()
+end
+
+
+--FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
+
+function AlmanacParseCalendarLine(line)
+local event, toks
+
+event=EventCreate()
+toks=strutil.TOKENIZER(line, "\\S", "Q")
+event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.UID=toks:next()
+event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
+event.Title=toks:next()
+event.Location=toks:next()
+event.Details=strutil.unQuote(toks:next())
+event.URL=strutil.unQuote(toks:next())
+event.Status=""
+
+return event
+end
+
+
+function AlmanacLoadCalendarFile(Collated, cal, Path)
+local S, str, event, old_event, toks, when
+local tmpTable={}
+
+
+
+S=stream.STREAM(Path)
+if S ~= nil
+then
+str=S:readln()
+while str ~= nil
+do
+	event=AlmanacParseCalendarLine(str)
+	old_event=tmpTable[event.UID]
+	if old_event ~= nil
+	then
+	old_event.Status="moved"
+	tmpTable[old_event.UID.."-moved"]=old_event
+	end
+
+	tmpTable[event.UID]=event
+	str=S:readln()
+end
+S:close()
+end
+
+
+for key,event in pairs(tmpTable)
+do
+	when=Settings.WarnTime
+	if Settings.WarnRaisedTime > Settings.WarnTime then when=Settings.WarnRaisedTime end
+	if when > 0 and (Now - event.Start) < when
+	then
+		table.insert(WarnEvents, event)
+	end
+
+	table.insert(Collated, event)
+end
+
+end
+
+
+
+function AlmanacLoadCalendar(Collated, cal, start_time, end_time)
+local str, prev, when
+
+if start_time == nil then start_time=time.secs() end
+if end_time == nil then end_time=time.secs() end
+
+when=start_time
+while when <= end_time
+do
+str=process.getenv("HOME") .. time.formatsecs("/.almanac/%b-%Y.cal", when)
+if str ~= prev then AlmanacLoadCalendarFile(Collated, cal, str) end
+prev=str
+when=when+3600
+end
+
+end
+
+
+function AlmanacAddEvent(event)
+local S, str
+
+str=process.getenv("HOME") .. "/.almanac/"
+filesys.mkdir(str)
+
+str=str..time.formatsecs("%b-%Y.cal", event.Start)
+S=stream.STREAM(str, "a")
+if S ~= nil
+then
+str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
+str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
+str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
+if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
+S:writeln(str.."\n")
+S:close()
+end
+end
+
+
+
+
+--this function substitutes named values like '$(day)' with their actual data
+function SubstituteEventStrings(format, event)
+local toks, str, diff 
+local values={}
+local output=""
+
+if event.Start==nil then return "" end
+
+values["date"]=time.formatsecs("%Y/%m/%d", event.Start)
+values["time"]=time.formatsecs("%H:%M:%S", event.Start)
+values["day"]=time.formatsecs("%d", event.Start)
+values["month"]=time.formatsecs("%m", event.Start)
+values["Year"]=time.formatsecs("%Y", event.Start)
+values["year"]=time.formatsecs("%y", event.Start)
+values["dayname"]=time.formatsecs("%A", event.Start)
+values["daynick"]=time.formatsecs("%a", event.Start)
+values["monthname"]=time.formatsecs("%B", event.Start)
+values["monthnick"]=time.formatsecs("%b", event.Start)
+values["location"]=event.Location
+values["title"]=event.Title
+values["status"]=event.Status
+
+if values["date"]==Today 
+then 
+	values["dayid"]="Today"
+	values["dayid_color"]="~r~eToday~0"
+	values["daynick_color"]=time.formatsecs("~r~e%a~0", event.Start)
+elseif values["date"]==Tomorrow
+then 
+	values["dayid"]="Tomorrow"
+	values["dayid_color"]="~y~eTomorrow~0"
+	values["daynick_color"]=time.formatsecs("~y~e%a~0", event.Start)
+elseif event.Start < Now
+then
+	values["dayid"]=time.formatsecs("%A", event.Start)
+	values["dayid_color"]=time.formatsecs("~R~n%a~0", event.Start)
+	values["daynick_color"]=time.formatsecs("~R~n%a~0", event.Start)
+else
+	values["dayid"]=time.formatsecs("%A", event.Start)
+	values["dayid_color"]=time.formatsecs("%a", event.Start)
+	values["daynick_color"]=time.formatsecs("%a", event.Start)
+end
+
+
+diff=event.Start - Now
+if diff < 0 then str="~R~b"
+elseif diff < (10 * 60)  then str="~r"
+elseif diff < (30 * 60) then str="~m"
+elseif diff < (60 * 60) then str="~g"
+else str=""
+end
+
+values["time_color"]=str ..time.formatsecs("%H:%M:%S", event.Start).."~0"
+
+diff=event.End - event.Start
+if diff < 0
+then
+	values["duration"]="??????"
+elseif diff < 3600
+then
+	values["duration"]=string.format("%dmins", diff / 60)
+else
+	values["duration"]=time.formatsecs("%Hh%Mm", diff)
+end
+
+toks=strutil.TOKENIZER(format, "$(|)", "ms")
+str=toks:next()
+while str ~= nil
+do
+  if str=="$("
+  then
+    str=toks:next()
+    if values[str] ~= nil then output=output .. values[str] end
+  elseif strutil.strlen(str) and str ~= ")"
+  then
+    output=output..str
+  end
+  str=toks:next()
+end
+
+return output
 end
 
 
@@ -1185,127 +1126,55 @@ end
 
 
 
--- called by 'OutputCalendar' to check if an event has been 'hidden' and should not be displayed
-function EventShow(event, config)
-local TOK, pattern, invert
-local result=false
+-- These functions output calendars in the format for Sanjay Ghemawat's 'ical' program,
+-- https://en.wikipedia.org/wiki/Ical_%28Unix%29
+-- which is nothing to do with Apple's 'ical' format
 
-if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
-
-if event.Start == nil then return false end
-if event.Start < config.EventsStart then return false end
-if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end
-
-if strutil.strlen(config.selections)==0 then return true end
-
-TOK=strutil.TOKENIZER(config.selections,",")
-pattern=TOK:next()
-while pattern ~= nil
-do
-	invert=false
-	if string.sub(pattern, 1, 1) == "!" then 
-		invert=true 
-		pattern=string.sub(pattern, 2)
-	end
-
-	if strutil.pmatch(pattern, event.Title) == false 
-	then 
-		if invert then result=false
-		else result=true end
-	else
-		if invert then result=true
-		else result=false end
-	end
-	pattern=TOK:next()
+function OutputSGIcalHeader(Out)
+Out:writeln("Calendar [v2.0]\n")
 end
 
-return result
+function OutputSGIcalTrailer(Out)
+end
+
+function OutputEventSGIcal(Out, event)
+local str, date
+
+Out:writeln("Appt [\n")
+start_str=time.formatsecs("%Y%m%dT000000", event.Start)
+diff=event.Start - time.tosecs("%Y%m%dT%H%M%S", start_str)
+Out:writeln(string.format("Start [%d]\n", diff / 60))
+
+diff=(event.End - event.Start)
+if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength then diff=Settings.MaxEventLength end
+Out:writeln(string.format("Length [%d]\n", diff / 60))
+Out:writeln("Uid ["..event.UID.."]\n")
+str="Contents [" .. event.Title
+if strutil.strlen(event.Location) > 0 then str=str.. "\nAt: " .. event.Location end
+if strutil.strlen(event.Description) > 0 then str=str.. "\n" .. event.Description end
+str=str.."]\n"
+Out:writeln(str)
+Out:writeln("Remind [1]\n");
+Out:writeln("Hilite [1]\n");
+Out:writeln(time.formatsecs("Dates [Single %d/%m/%Y End ]\n", event.Start));
+Out:writeln("]\n");
 end
 
 
-function OutputEvent(event)
 
-if event ~= nil
+
+function XtermTitle(Term, title)
+local str
+local ev={}
+
+if strutil.strlen(title) > 0
 then
-if Settings.OutputFormat=="csv" then OutputEventCSV(Out, event) 
-elseif Settings.OutputFormat=="ical" then OutputEventICAL(Out, event) 
-elseif Settings.OutputFormat=="sgical" then OutputEventSGIcal(Out, event) 
-elseif Settings.OutputFormat=="txt" then OutputEventTXT(event) 
-else OutputEventANSI(event)
+	ev.Start=Now;
+	ev.End=Now;
+	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(title, ev))
+	Term:puts(str)			
 end
 end
-
-end
-
-
-function OutputCalendar(Events, config)
-local i, event
-local displayed_events_count=0
-
-if Settings.OutputFormat=="csv" then OutputCSVHeader(Out) 
-elseif Settings.OutputFormat=="ical" then OutputICALHeader(Out) 
-elseif Settings.OutputFormat=="sgical" then OutputSGIcalHeader(Out) 
-end
-
-for i,event in ipairs(Events)
-do
-	if EventShow(event, config) 
-	then
-	OutputEvent(event)
-	displayed_events_count=displayed_events_count + 1
-	end
-end
-
-if Settings.OutputFormat=="csv" then OutputCSVTrailer(Out) 
-elseif Settings.OutputFormat=="ical" then OutputICALTrailer(Out)
-elseif Settings.OutputFormat==""
-then  
-	if displayed_events_count==0 then print(terminal.format("~r" .. "no events to display" .. "~0")) end
-end
-
-end
-
-
-
--- Sort events callback function. Sorts in date order and also finds the most recent event (which is used to decide whether to display events older than today)
-function EventsSort(ev1, ev2)
-
-if ev1.Start > EventsNewest then EventsNewest=ev1.Start end
-if ev2.Start > EventsNewest then EventsNewest=ev2.Start end
-
-if ev1.Start < ev2.Start then return true end
-return false
-end
-
-
-
-function LoadCalendarEvents(calendars, selections, Events)
-local toks, cal
-
-toks=strutil.TOKENIZER(calendars,",")
-cal=toks:next()
-while cal ~= nil
-do
-if strutil.strlen(cal) > 0
-then
-	if string.sub(cal,1, 2) == "a:" then AlmanacLoadCalendar(Events, string.sub(cal, 3)) 
-	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Events, string.sub(cal, 3)) 
-	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Events, string.sub(cal, 3)) 
-	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Events, "http://" .. string.sub(cal, 8))
-	else DocumentLoadEvents(Events, cal)
-	end
-end
-cal=toks:next()
-end
-
-if #Events > 0
-then
-	table.sort(Events, EventsSort)
-	--if EventsNewest < Now or #Events < 2 then config.EventsStart=0 end
-end
-
-end
-
 
 function PrintHelp()
 print("almanac - version: "..VERSION)
@@ -1474,7 +1343,6 @@ end
 
 
 
-
 function ParseArg(args, i)
 local val
 
@@ -1529,7 +1397,7 @@ then
 	NewEvent.Visibility="private"
 elseif arg=="-start" or arg=="-s"
 then
-	--do nothing! this is handled by the earlier loop
+	--do nothing! this is handled by the earlier loop in 'ParseCommandLine'
 elseif arg=="-end"
 then
 	Config.EventsEnd=ParseDate(ParseArg(args, i+1))
@@ -1636,72 +1504,37 @@ end
 
 
 
-function ImportItems(action, items)
-local toks, url
+function DisplayCalendarMenu(Out, calendars) 
+local menu, str
+local cal_list
+local Term
 
-toks=strutil.TOKENIZER(items, "\n")
-url=toks:next()
-while url ~= nil
+Term=terminal.TERM(Out)
+Term:clear()
+menu=terminal.TERMMENU(Term, 1, 1, Term:width() -1, Term:height() -1)
+menu:add("all")
+menu:add("Recently Added", "recent")
+
+toks=strutil.TOKENIZER(calendars,",")
+str=toks:next()
+while str ~= nil
 do
-	if action=="import-email"
-	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent)
-	else
-	ImportEventsToCalendar(url, calendars)
-	end
-url=toks:next()
+	menu:add(str)	
+	str=toks:next()
 end
 
-end
-
-
-function ConvertItems(action, items)
-local toks, url
-local Events={}
-
-toks=strutil.TOKENIZER(items, "\n")
-url=toks:next()
-while url ~= nil
-do
-	if action=="convert-email"
-	then
-	EmailExtractCalendarItems(url, OutputEvent)
-	else
-	DocumentLoadEvents(Events, url)
-	OutputCalendar(Events, config)
-	end
-
-url=toks:next()
-end
-
-end
-
-
-
-
-
-function XtermTitle(Term, title)
-local str
-local ev={}
-
-if strutil.strlen(title) > 0
+str=menu:run()
+if str=="all"
 then
-	ev.Start=Now;
-	ev.End=Now;
-	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(title, ev))
-	Term:puts(str)			
-end
+	cal_list=calendars
+else
+	cal_list=str
 end
 
-
-
-function LoadAndOutputCalendar(config)
-local Events={}
-
-LoadCalendarEvents(config.calendars, config.selections, Events)
-OutputCalendar(Events, config)
-
+return cal_list
 end
+
+
 
 
 function EventSoonest(WarnEvents)
@@ -1759,37 +1592,6 @@ return action
 end
 
 
-function DisplayCalendarMenu(Out, calendars) 
-local menu, str
-local cal_list
-local Term
-
-Term=terminal.TERM(Out)
-Term:clear()
-menu=terminal.TERMMENU(Term, 1, 1, Term:width() -1, Term:height() -1)
-menu:add("all")
-menu:add("Recently Added", "recent")
-
-toks=strutil.TOKENIZER(calendars,",")
-str=toks:next()
-while str ~= nil
-do
-	menu:add(str)	
-	str=toks:next()
-end
-
-str=menu:run()
-if str=="all"
-then
-	cal_list=calendars
-else
-	cal_list=str
-end
-
-return cal_list
-end
-
-
 
 -- This function loops around outputing a list of events
 function PersistentScheduleDisplay(config)
@@ -1835,6 +1637,234 @@ do
 
 end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- create a blank event object
+function EventCreate()
+local Event={}
+
+Event.Attendees=0
+Event.UTCoffset=0;
+Event.UID=string.format("%x",time.secs())
+Event.Title=""
+Event.Details=""
+Event.Status=""
+Event.Location=""
+Event.Details=""
+Event.Visibility=""
+Event.Start=0
+Event.End=0
+Event.URL=""
+
+return Event
+end
+
+
+
+
+
+function ImportEventsToCalendar(url, calendars)
+local Events={}
+
+DocumentLoadEvents(Events, url)
+for i,event in ipairs(Events)
+do
+GCalAddEvent(calendars, event)
+AlmanacAddEvent(event)
+end
+end
+
+
+
+
+
+-- called by 'OutputCalendar' to check if an event has been 'hidden' and should not be displayed
+function EventVisible(event, config)
+local TOK, pattern, invert
+local result=false
+
+if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
+
+if event.Start == nil then return false end
+if event.Start < config.EventsStart then return false end
+if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end
+
+if strutil.strlen(config.selections)==0 then return true end
+
+TOK=strutil.TOKENIZER(config.selections,",")
+pattern=TOK:next()
+while pattern ~= nil
+do
+	invert=false
+	if string.sub(pattern, 1, 1) == "!" then 
+		invert=true 
+		pattern=string.sub(pattern, 2)
+	end
+
+	if strutil.pmatch(pattern, event.Title) == false 
+	then 
+		if invert then result=false
+		else result=true end
+	else
+		if invert then result=true
+		else result=false end
+	end
+	pattern=TOK:next()
+end
+
+return result
+end
+
+
+function OutputEvent(event)
+
+if event ~= nil
+then
+if Settings.OutputFormat=="csv" then OutputEventCSV(Out, event) 
+elseif Settings.OutputFormat=="ical" then OutputEventICAL(Out, event) 
+elseif Settings.OutputFormat=="sgical" then OutputEventSGIcal(Out, event) 
+elseif Settings.OutputFormat=="txt" then OutputEventTXT(event) 
+else OutputEventANSI(event)
+end
+end
+
+end
+
+
+function OutputCalendar(Events, config)
+local i, event
+local displayed_events_count=0
+
+if Settings.OutputFormat=="csv" then OutputCSVHeader(Out) 
+elseif Settings.OutputFormat=="ical" then OutputICALHeader(Out) 
+elseif Settings.OutputFormat=="sgical" then OutputSGIcalHeader(Out) 
+end
+
+for i,event in ipairs(Events)
+do
+	if EventVisible(event, config) 
+	then
+	OutputEvent(event)
+	displayed_events_count=displayed_events_count + 1
+	end
+end
+
+if Settings.OutputFormat=="csv" then OutputCSVTrailer(Out) 
+elseif Settings.OutputFormat=="ical" then OutputICALTrailer(Out)
+elseif Settings.OutputFormat==""
+then  
+	if displayed_events_count==0 then print(terminal.format("~r" .. "no events to display" .. "~0")) end
+end
+
+end
+
+
+
+-- Sort events callback function. Sorts in date order and also finds the most recent event (which is used to decide whether to display events older than today)
+function EventsSort(ev1, ev2)
+
+if ev1.Start > EventsNewest then EventsNewest=ev1.Start end
+if ev2.Start > EventsNewest then EventsNewest=ev2.Start end
+
+if ev1.Start < ev2.Start then return true end
+return false
+end
+
+
+
+function LoadCalendarEvents(calendars, selections, Events)
+local toks, cal
+
+toks=strutil.TOKENIZER(calendars,",")
+cal=toks:next()
+while cal ~= nil
+do
+if strutil.strlen(cal) > 0
+then
+	if string.sub(cal,1, 2) == "a:" then AlmanacLoadCalendar(Events, string.sub(cal, 3), config.EventsStart, config.EventsEnd) 
+	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Events, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Events, string.sub(cal, 3)) 
+	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Events, "http://" .. string.sub(cal, 8))
+	else DocumentLoadEvents(Events, cal)
+	end
+end
+cal=toks:next()
+end
+
+if #Events > 0
+then
+	table.sort(Events, EventsSort)
+	--if EventsNewest < Now or #Events < 2 then config.EventsStart=0 end
+end
+
+end
+
+
+
+
+
+function ImportItems(action, items)
+local toks, url
+
+toks=strutil.TOKENIZER(items, "\n")
+url=toks:next()
+while url ~= nil
+do
+	if action=="import-email"
+	then
+	EmailExtractCalendarItems(url, AlmanacAddEvent)
+	else
+	ImportEventsToCalendar(url, calendars)
+	end
+url=toks:next()
+end
+
+end
+
+
+function ConvertItems(action, items)
+local toks, url
+local Events={}
+
+toks=strutil.TOKENIZER(items, "\n")
+url=toks:next()
+while url ~= nil
+do
+	if action=="convert-email"
+	then
+	EmailExtractCalendarItems(url, OutputEvent)
+	else
+	DocumentLoadEvents(Events, url)
+	OutputCalendar(Events, config)
+	end
+
+url=toks:next()
+end
+
+end
+
+
+
+function LoadAndOutputCalendar(config)
+local Events={}
+
+LoadCalendarEvents(config.calendars, config.selections, Events)
+OutputCalendar(Events, config)
+
+end
+
 
 
 
