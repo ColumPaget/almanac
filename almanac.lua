@@ -687,6 +687,7 @@ if filesys.exists(url) == true then return(stream.STREAM(url, "r")) end
 for i,extn in ipairs(extns)
 do
 str=process.getenv("HOME") .. "/.almanac/" .. dochash..extn
+filesys.mkdirPath(str)
 if filesys.exists(str) == true and (time.secs() - filesys.mtime(str)) < Settings.CacheTime then return(stream.STREAM(str, "r")) end
 end
 
