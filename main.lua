@@ -245,7 +245,7 @@ Settings.ShowDetail=false
 Settings.ShowURL=false
 
 -- xterm title line to display when in persist mode
-Settings.XtermTitle="$(dayname) $(day) $(monthname)"
+Settings.XtermTitle="Almanac: $(version) Today: $(dayname) $(day) $(monthname)"
 
 Settings.RefreshTime=ParseDuration("2m")
 

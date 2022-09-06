@@ -20,6 +20,20 @@ values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
 values["status"]=event.Status
+values["version"]=VERSION
+
+values["todaynick"]=time.formatsecs("%a", Now)
+values["todayname"]=time.formatsecs("%A", Now)
+values["nowdate"]=time.formatsecs("%Y/%m/%d", Now)
+values["nowtime"]=time.formatsecs("%H:%M:%S", Now)
+values["nowday"]=time.formatsecs("%d", Now)
+values["nowmonth"]=time.formatsecs("%m", Now)
+values["nowyear"]=time.formatsecs("%Y", Now)
+values["nowhour"]=time.formatsecs("%H", Now)
+values["nowmin"]=time.formatsecs("%M", Now)
+values["nowsec"]=time.formatsecs("%S", Now)
+
+
 
 if values["date"]==Today 
 then 

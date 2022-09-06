@@ -5,6 +5,8 @@ licence: GPLv3
 
 Almanac is a calendar app that can store events in a local calendar, and display them as a simple list of events. It can download events from google calendars, meetup.com calendars, rss feeds with xCal extensions and iCal/ics feeds, and display these or add them to the local calendar. It can also insert events into a google calendar. It can output events in a number of formats, including csv, ical and 'sgical' which is the file format of Sanjay Ghemawat's 'ical' application.
 
+
+## Requirements
 To use almanac you will need to have the following installed:
 
 lua              http://www.lua.org                          at least version 5.3  
@@ -12,6 +14,13 @@ libUseful        http://github.com/ColumPaget/libUseful      at least verson 3.6
 libUseful-lua    http://github.com/ColumPaget/libUseful-lua  at least version 1.2  
 
 you will need swig (http://www.swig.org) installed to compile libUseful-lua
+
+
+## Build/install
+
+the distribution comes as a load of .lua files that are compiled into a single 'almanac.lua' file using 'make'. A premade 'almanac.lua' is provided. You can copy this to anywhere in your path and run it with lua (`lua <path>`, e.g `lua /usr/local/bin`), or else use linux's 'binfmt' system to invoke lua for lua scripts.
+
+'make install' copies almanac.lua to /usr/local/bin
 
 
 Some example calendars you might want to view are:
@@ -35,7 +44,7 @@ m:fizzPOP-Birminghams-Makerspace   - my local hacker/maker space
 
 ## ICAL calendars online
 ```
-https://launchlibrary.net/1.3/calendar/next/100                    - Launch Library's list of upcoming space launches
+https://calendar.google.com/calendar/ical/nextspaceflight.com_l328q9n2alm03mdukb05504c44%40group.calendar.google.com/public/basic.ics      - nextspaceflight.com upcoming launches
 http://events.ucl.ac.uk/calendar/events.ics                        - Events at University College London 
 http://www.sussex.ac.uk/broadcast/feed/event/sussex-lectures.ics   - Sussex Uni public lectures
 https://www.dur.ac.uk/scripts/events/ical.php?category=51          - Durham Uni public lectures
@@ -133,6 +142,16 @@ The following options all relate to inserting an event into an almanac or a goog
 
 example: almanac.lua -add "dental appointment" -start "2020/01/23"
 
+##PERSIST MODE
+
+If the '-persist' command-line flag is provided, then persistent/interactive mode is enabled. In this mode almanac prints out a list of events, then waits a 'refresh interval' and prints it out again with any updates that have occurred. This provides a persistent 'event list'. In this mode one can move forwards and backwards through the calendar using the left and right arrow keys, or else the ',' and '.' keys. The size of each 'page' depends on the interval requested with the '-w' or '-d' options. The 'space' key returns the calendar to 'now' and pressing the escape-key twice causes almanac.lua to exit.
+
+e.g. for a persistent eventlist with a page-size of 2 weeks:
+
+```
+almanac.lua -persist -w 2
+```
+
 
 ##TIME FORMATS
 
@@ -171,8 +190,8 @@ In the default mode, ansi display mode, you can specify the line-by-line output 
 data identifiers: these are strings that will be replaced by the specified value
 ```
 $(title)           event title/summary
-$(date)            start date in Y/m/d format
-$(time)            start time in H:M:S format
+$(date)            start date of displayed calendar in Y/m/d format
+$(time)            start time of displayed calendar in H:M:S format
 $(day)             numeric day of month
 $(month)           numeric month of year
 $(Year)            year in 4-digit format
@@ -186,7 +205,17 @@ $(dayid_color)     like dayid, but today will be in ansi red, tomorrow in ansi y
 $(daynick_color)   like daynick, but today will be in ansi red, tomorrow in ansi yellow, although they will still have daynick names
 $(location)        event location
 $(duration)        event duration
-```
+$(todayname)       name of today, regardless of what's being displayed on the calendar
+$(todaynick)       nick/short name of today, regardless of what's being displayed on the calendar
+$(nowtime)         time now, regardless of what's displayed on the calendar
+$(nowdate)         date now, regardless of what's displayed on the calendar
+$(nowyear)         year now, regardless of what's displayed on the calendar
+$(nowmonth)        month number now, regardless of what's displayed on the calendar
+$(nowday)          day number now, regardless of what's displayed on the calendar
+$(nowhour)         hour now, regardless of what's displayed on the calendar
+$(nowmin)          minutes now, regardless of what's displayed on the calendar
+$(nowsec)          seconds now, regardless of what's displayed on the calendar
+``
 
 color identifiers: format strings that specifier colors
 ```

@@ -1006,6 +1006,20 @@ values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
 values["status"]=event.Status
+values["version"]=VERSION
+
+values["todaynick"]=time.formatsecs("%a", Now)
+values["todayname"]=time.formatsecs("%A", Now)
+values["nowdate"]=time.formatsecs("%Y/%m/%d", Now)
+values["nowtime"]=time.formatsecs("%H:%M:%S", Now)
+values["nowday"]=time.formatsecs("%d", Now)
+values["nowmonth"]=time.formatsecs("%m", Now)
+values["nowyear"]=time.formatsecs("%Y", Now)
+values["nowhour"]=time.formatsecs("%H", Now)
+values["nowmin"]=time.formatsecs("%M", Now)
+values["nowsec"]=time.formatsecs("%S", Now)
+
+
 
 if values["date"]==Today 
 then 
@@ -1163,14 +1177,21 @@ end
 
 
 
-function XtermTitle(Term, title)
+function XtermTitle(Term, title, when)
 local str
 local ev={}
 
-if strutil.strlen(title) > 0
+if when ~= nil
 then
+	ev.Start=when.Start
+	ev.End=when.End
+else
 	ev.Start=Now;
 	ev.End=Now;
+end
+
+if strutil.strlen(title) > 0
+then
 	str=string.format("\x1b]2;%s\x07", SubstituteEventStrings(title, ev))
 	Term:puts(str)			
 end
@@ -1549,41 +1570,67 @@ return soonest
 end
 
 
-function WaitEvents(Out)
-local event, action="", ch, title
+function InteractiveDisplayTitle(Term)
+local ev={}
+local title
 
-	title=Settings.XtermTitle
+title=Settings.XtermTitle
 
-	if #WarnEvents > 0
+-- if there are events that are marked to raise a warning, then format the warning title
+if #WarnEvents > 0
+then
+	event=EventSoonest(WarnEvents)
+	if event.Start < Settings.WarnRaisedTime then Out:puts("\x1b[5t") end
+
+	if display_count % 2 == 0
 	then
-		event=EventSoonest(WarnEvents)
-		if event.Start < Settings.WarnRaisedTime then Out:puts("\x1b[5t") end
-
-		if display_count % 2 == 0
-		then
 		title=string.format("* * *   %s in %d mins", event.Title, math.floor((event.Start - Now) / 60))
-		else
-		title=string.format("_ _ _   %s in %d mins", event.Title, math.floor((event.Start - Now) / 60))
-		end
-
-		next_update=Now + 1	
-		Out:timeout(100) --one sec
 	else
-		Out:timeout(1000) --ten secs
+		title=string.format("_ _ _   %s in %d mins", event.Title, math.floor((event.Start - Now) / 60))
 	end
 
+	next_update=Now + 1	
+	Out:timeout(100) --one sec
+else
+	Out:timeout(1000) --ten secs
+end
 
-	XtermTitle(Out, title)
-	ch=Out:getc()
+
+if strutil.strlen(title) > 0
+then
+	 ev.Start=config.EventsStart
+	 ev.End=config.EventsEnd
+	 XtermTitle(Term, title, ev)
+end
+
+end
+
+
+function WaitEvents(Term)
+local event, action="", ch
+local pagesize
+
+pagesize=config.EventsEnd - config.EventsStart
+
+	InteractiveDisplayTitle(Term)
+	ch=Term:getc()
 
 	if ch=="m" then
 		action="menu"
-	elseif ch=="LEFT" then 
-		config.EventsStart=config.EventsStart - (3600 * 24 *7)
+	elseif ch=="LEFT" or ch=="." then 
+		config.EventsStart=config.EventsStart - pagesize
+		config.EventsEnd=config.EventsEnd - pagesize
 		action="refresh"
-	elseif ch=="RIGHT" then 
-		config.EventsStart=config.EventsStart + (3600 * 24 *7)
+	elseif ch=="RIGHT" or ch=="," then 
+		config.EventsStart=config.EventsStart + pagesize
+		config.EventsEnd=config.EventsEnd + pagesize
 		action="refresh"
+	elseif ch==" " then
+		config.EventsStart=Now
+		config.EventsEnd=Now + pagesize
+		action="refresh"
+	elseif ch=="ESC" then
+		action="quit"
 	end
 
 	display_count=display_count + 1
@@ -1603,15 +1650,16 @@ Term=terminal.TERM(Out)
 next_update=Now
 
 display_calendars=config.calendars
-while true
+while action ~= "quit"
 do
 	Events={}
 	WarnEvents={}
 	LoadCalendarEvents(display_calendars, config.selections, Events)
+	InteractiveDisplayTitle(Term)
 
 	if Term ~= nil
 	then
-		XtermTitle(Term, Settings.XtermTitle)
+
 		Term:puts("\x1b[3J") -- clear scrollback buffer
 		Term:clear()
 		Term:move(0,0)
@@ -1631,6 +1679,7 @@ do
 			display_calendars=DisplayCalendarMenu(Term, config.calendars)
 			Term:clear()
 			break
+		elseif action == "quit" then break
 		end
 		UpdateTimes()
 	end
@@ -1891,7 +1940,7 @@ Settings.ShowDetail=false
 Settings.ShowURL=false
 
 -- xterm title line to display when in persist mode
-Settings.XtermTitle="$(dayname) $(day) $(monthname)"
+Settings.XtermTitle="Almanac: $(version) Today: $(dayname) $(day) $(monthname)"
 
 Settings.RefreshTime=ParseDuration("2m")
 
