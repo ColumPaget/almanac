@@ -161,6 +161,7 @@ local S, mime_info, boundary, str
 S=stream.STREAM(path, "r")
 if S ~= nil
 then
+if config.debug==true then io.stderr:write("open email '"..path.."\n") end
 mime_info=EmailReadHeaders(S)
 EmailHandleMimeContainer(S, mime_info, EventsFunc)
 S:close()

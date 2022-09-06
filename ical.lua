@@ -113,6 +113,8 @@ Event=EventCreate()
 key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
+if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value.."\n") end
+
 	if key=="END" and value=="VEVENT" then break
 	elseif key=="UID" then Event.UID=value 
 	elseif key=="BEGIN" then ICalReadPastSubItem(lines, value)
@@ -136,6 +138,7 @@ do
 end
 
 ICalPostProcess(Event)
+if config.debug==true then io.stderr:write("ical event:  '"..Event.Title.."' " .. time.formatsecs("%Y/%m/%d", Event.Start).."\n") end
 table.insert(Events, Event)
 
 end

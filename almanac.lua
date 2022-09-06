@@ -343,6 +343,8 @@ Event=EventCreate()
 key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
+if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value.."\n") end
+
 	if key=="END" and value=="VEVENT" then break
 	elseif key=="UID" then Event.UID=value 
 	elseif key=="BEGIN" then ICalReadPastSubItem(lines, value)
@@ -366,6 +368,7 @@ do
 end
 
 ICalPostProcess(Event)
+if config.debug==true then io.stderr:write("ical event:  '"..Event.Title.."' " .. time.formatsecs("%Y/%m/%d", Event.Start).."\n") end
 table.insert(Events, Event)
 
 end
@@ -634,6 +637,7 @@ local S, mime_info, boundary, str
 S=stream.STREAM(path, "r")
 if S ~= nil
 then
+if config.debug==true then io.stderr:write("open email '"..path.."\n") end
 mime_info=EmailReadHeaders(S)
 EmailHandleMimeContainer(S, mime_info, EventsFunc)
 S:close()
@@ -1251,6 +1255,7 @@ print("   -u         Terminal supports unicode up to code 0x8000")
 print("   -unicode   Terminal supports unicode up to code 0x8000")
 print("   -u2        Terminal supports unicode up to code 0x8000")
 print("   -unicode2  Terminal supports unicode up to code 0x10000")
+print("   -debug     Print debug output")
 print("   -?          This help")
 print("   -h          This help")
 print("   -help       This help")
