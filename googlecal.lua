@@ -6,7 +6,7 @@ local url, S, text, doc, cal, Tokens
 
 if OA==nil
 then
-	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	OA=oauth.OAUTH("pkce","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v2/token");
 	if OA:load() == 0 then OAuthGet(OA) end
 
 end
@@ -27,6 +27,7 @@ if strutil.strlen(NewEvent.Visibility) > 0 then text=text.."\"visibility\": \"".
 text=text.."\"start\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.Start,"GMT") .. "\"\n},\n"
 text=text.."\"end\": {\n\"dateTime\": \"" .. time.formatsecs("%Y-%m-%dT%H:%M:%SZ", NewEvent.End,"GMT") .. "\"\n}\n"
 text=text.. "}"
+
 S=stream.STREAM(url, "w oauth=" .. OA:name() .. " content-type=" .. "application/json " .. "content-length=" .. strutil.strlen(text))
 
 S:writeln(text)
@@ -70,9 +71,11 @@ end
 function GCalLoadCalendar(Collated, cal)
 local S, P, Events, Item, doc, url
 
+process.lu_set("HTTP:Debug", "Y")
+
 if OA==nil
 then
-	OA=oauth.OAUTH("auth","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
+	OA=oauth.OAUTH("pkce","gcal",Settings.GCalClientID, Settings.GCalClientSecret,"https://www.googleapis.com/auth/calendar", "https://www.googleapis.com/oauth2/v4/token");
 	if OA:load() == false then OAuthGet(OA) end
 end
 
@@ -82,8 +85,11 @@ then
 	url=url.."&timeMin="..strutil.httpQuote(time.formatsecs("%Y-%m-%dT%H:%M:%SZ", config.EventsStart))
 end
 
-S=stream.STREAM(url,"oauth="..OA:name())
+S=stream.STREAM(url, "r oauth="..OA:name())
 doc=S:readdoc()
+
+if config.debug==true then io.stderr:write("googlecalendar: "..doc.."\n") end
+
 
 P=dataparser.PARSER("json", doc)
 Events=P:open("/items")

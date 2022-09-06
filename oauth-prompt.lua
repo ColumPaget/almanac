@@ -1,8 +1,7 @@
 -- do initial oauth authentication
 function OAuthGet(OA)
 
-str=strutil.httpQuote("urn:ietf:wg:oauth:2.0:oob");
-OA:set("redirect_uri", str);
+OA:set("redirect_uri", "http://127.0.0.1:8989");
 OA:stage1("https://accounts.google.com/o/oauth2/v2/auth");
 
 print()
@@ -10,8 +9,8 @@ print("GOOGLE CALENDAR REQUIRES OAUTH LOGIN. Goto the url below, grant permissio
 print()
 print("GOTO: ".. OA:auth_url());
 
-OA:listen(8989, "https://www.googleapis.com/oauth2/v4/token");
-OA:save("");
+OA:listen(8989, "https://www.googleapis.com/oauth2/v2/token");
+OA:finalize("https://oauth2.googleapis.com/token");
 print()
 end
 

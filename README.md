@@ -26,7 +26,7 @@ the distribution comes as a load of .lua files that are compiled into a single '
 
 Some example calendars you might want to view are:
 
-## Google calendars. Note leading 'g:' prefix for use with almanac
+## Google calendars. Note leading 'g:' prefix for use with almanac (unforunately many of these seem dead after covid lockdowns)
 ```
 g:calendar@hackercons.org
 g:ukkchmv8h0pofbg4if8bekv5d4@group.calendar.google.com   - Royal Astronomical Society public lectures
@@ -43,7 +43,7 @@ g:ledd3p7h7mpfulbn5hih6pohj8@group.calendar.google.com   - Sheffield Hackspace
 m:fizzPOP-Birminghams-Makerspace   - my local hacker/maker space
 ```
 
-## ICAL calendars online
+## ICAL calendars online (these are becoming fewer)
 ```
 https://calendar.google.com/calendar/ical/nextspaceflight.com_l328q9n2alm03mdukb05504c44%40group.calendar.google.com/public/basic.ics      - nextspaceflight.com upcoming launches
 http://events.ucl.ac.uk/calendar/events.ics                        - Events at University College London 
@@ -52,16 +52,18 @@ https://www.dur.ac.uk/scripts/events/ical.php?category=51          - Durham Uni 
 https://www.snb.ch/en/mmr/events/id/calendar_full_2018.en.ics      - Bank of Switzerland events 2018
 ```
 
-## RSS/xCal calendars
-```
-http://rss.royalsociety.org/events/upcoming    - Royal society events
-```
 
 You can find a bunch of ical calendars here:
 
 ```
 http://icalshare.com/
 ```
+
+
+## RSS/xCal calendars
+
+None of these seem to still be alive
+
 
 If you find any other public calendars that people might be interested in, you can email them to me at 'colums.projects@gmail.com' and I'll add them to this list
 
