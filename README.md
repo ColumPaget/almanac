@@ -22,6 +22,7 @@ the distribution comes as a load of .lua files that are compiled into a single '
 
 'make install' copies almanac.lua to /usr/local/bin
 
+## Example calendars
 
 Some example calendars you might want to view are:
 
