@@ -5,30 +5,6 @@
 
 
 
--- create a blank event object
-function EventCreate()
-local Event={}
-
-Event.Attendees=0
-Event.UTCoffset=0;
-Event.UID=string.format("%x",time.secs())
-Event.Title=""
-Event.Details=""
-Event.Status=""
-Event.Location=""
-Event.Details=""
-Event.Visibility=""
-Event.Start=0
-Event.End=0
-Event.URL=""
-
-return Event
-end
-
-
-
-
-
 function ImportEventsToCalendar(url, calendars)
 local Events={}
 

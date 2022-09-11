@@ -140,6 +140,7 @@ The following options all relate to inserting an event into an almanac or a goog
    -at <location>         location of event
    -where <location>      location of event
    -location <location>   location of event
+   -recur <duration>      event recurrs every '<duration>'. Duration has the format <number><suffix> where suffix can be y=year,m=month,w=week,d=day,h=hour,m=minute. e.g. '-recur 2w' to recur every two weeks.
    -import <path>         import events from a .ical/.ics file and upload them to a calendar
 ```
 

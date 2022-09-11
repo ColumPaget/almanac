@@ -51,6 +51,9 @@ then
 	Config.action="add"
 	NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
+elseif arg=="-recur"
+then
+	NewEvent.Recur=ParseArg(args, i+1)
 elseif arg=="-start" or arg=="-s"
 then
 	--do nothing! this is handled by the earlier loop in 'ParseCommandLine'

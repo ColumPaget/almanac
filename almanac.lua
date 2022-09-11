@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="3.0"
+VERSION="4.0"
 Settings={}
 EventsNewest=0
 Now=0
@@ -28,6 +28,138 @@ Now=time.secs()
 Today=time.formatsecs("%Y/%m/%d", Now)
 Tomorrow=time.formatsecs("%Y/%m/%d", Now+3600*24)
 end
+
+-- create a blank event object
+function EventCreate()
+local Event={}
+
+Event.Attendees=0
+Event.UTCoffset=0;
+Event.UID=string.format("%x",time.secs())
+Event.Title=""
+Event.Details=""
+Event.Status=""
+Event.Location=""
+Event.Details=""
+Event.Visibility=""
+Event.Start=0
+Event.End=0
+Event.URL=""
+
+return Event
+end
+
+
+-- create a blank event object
+function EventClone(parent)
+local Event={}
+
+Event.Attendees=parent.Attendees
+Event.UTCoffset=parent.UTCoffset;
+Event.UID=parent.UID
+Event.Title=parent.Title
+Event.Details=parent.Details
+Event.Status=parent.Status
+Event.Location=parent.Location
+Event.Details=parent.Details
+Event.Visibility=parent.Visiblity
+Event.Start=parent.Start
+Event.End=parent.End
+Event.URL=parent.URL
+
+return Event
+end
+
+
+function EventRecurParse(event)
+local i, char, str
+local recur_suffix=""
+local recur_val=0
+
+str=""
+for i=1,strutil.strlen(event.Recurs),1
+do
+	char=string.sub(event.Recurs, i, i)
+	if tonumber(char) ~= nil then str=str .. char
+	else recur_suffix=recur_suffix..char
+	end
+end
+
+recur_val=tonumber(str)
+
+if recur_suffix=="y" then recur_val=recur_val * 3600 * 24 * 365
+elseif recur_suffix=="m" then recur_val=recur_val * 3600 * 24 * 31
+elseif recur_suffix=="w" then recur_val=recur_val * 3600 * 24 * 7
+elseif recur_suffix=="d" then recur_val=recur_val * 3600 * 24 
+elseif recur_suffix=="h" then recur_val=recur_val * 3600 
+end
+
+
+return recur_val
+end
+
+
+function EventRecurringCheckDST(when, start_hour)
+local recur_hour
+
+recur_hour=tonumber(time.formatsecs("%H", when)) 
+if recur_hour ~= start_hour
+then 
+if recur_hour > start_hour then diff = (recur_hour - start_hour) * 3600
+when= when + ((start_hour - recur_hour) * 3600) 
+end
+end
+
+return when
+end
+
+
+function EventRecurring(EventsList, event, start_time, end_time)
+local recur_val, when, start_hour, gmt_event, str, local_time
+local dst=false
+
+start_hour=tonumber(time.formatsecs("%H", event.Start, "GMT"))
+recur_val=EventRecurParse(event)
+
+-- convert to GMT so we don't have to deal with Daylight savings time
+str=time.formatsecs("%Y/%m/%d:%H:%M:%S", event.Start)
+when=time.tosecs("%Y/%m/%d:%H:%M:%S", str, "GMT")
+while when < end_time
+do
+
+when=EventRecurringCheckDST(when, start_hour)
+
+if when >= start_time and when <= end_time 
+then 
+	new_event=EventClone(event)
+	-- convert back from GMT, so that midnight is always midnight, not an hour adrift
+	str=time.formatsecs("%Y/%m/%d:%H:%M:%S", when, "GMT")
+	new_event.Start=time.tosecs("%Y/%m/%d:%H:%M:%S", str)
+	new_event.End=time.tosecs("%Y/%m/%d:%H:%M:%S", str)
+	table.insert(EventsList, new_event)
+end
+
+when=when + recur_val
+end
+
+return when
+end
+
+
+function EventRecursInPeriod(event, start_time, end_time)
+local recur_val, when
+
+recur_val=EventRecurParse(event)
+when=event.Start
+while when < end_time
+do
+if when >= start_time and when <= end_time then  return when end
+when=when + recur_val
+end
+
+return nil
+end
+
 
 
 --this function builds a single line from file formats (email headers and ical) that set limits on line length.
@@ -906,6 +1038,7 @@ event.Title=toks:next()
 event.Location=toks:next()
 event.Details=strutil.unQuote(toks:next())
 event.URL=strutil.unQuote(toks:next())
+event.Recurs=strutil.unQuote(toks:next())
 event.Status=""
 
 return event
@@ -915,8 +1048,7 @@ end
 function AlmanacLoadCalendarFile(Collated, cal, Path)
 local S, str, event, old_event, toks, when
 local tmpTable={}
-
-
+local count=0
 
 S=stream.STREAM(Path)
 if S ~= nil
@@ -949,10 +1081,24 @@ do
 	end
 
 	table.insert(Collated, event)
+	count=count+1
+end
+
+return count
+end
+
+
+function AlmanacLoadRecurring(Collated, cal, start_time, end_time)
+local Recurring={}
+local i, event, new_event
+
+AlmanacLoadCalendarFile(Recurring, cal, process.getenv("HOME") .. "/.almanac/recurrent.cal")
+for i,event in ipairs(Recurring)
+do
+	when=EventRecurring(Collated, event, start_time, end_time)
 end
 
 end
-
 
 
 function AlmanacLoadCalendar(Collated, cal, start_time, end_time)
@@ -960,6 +1106,8 @@ local str, prev, when
 
 if start_time == nil then start_time=time.secs() end
 if end_time == nil then end_time=time.secs() end
+
+AlmanacLoadRecurring(Collated, cal, start_time, end_time)
 
 when=start_time
 while when <= end_time
@@ -979,16 +1127,20 @@ local S, str
 str=process.getenv("HOME") .. "/.almanac/"
 filesys.mkdir(str)
 
-str=str..time.formatsecs("%b-%Y.cal", event.Start)
+if strutil.strlen(event.Recur) > 0 then str=str.."recurrent.cal"
+else str=str..time.formatsecs("%b-%Y.cal", event.Start)
+end
+
 S=stream.STREAM(str, "a")
 if S ~= nil
 then
-str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
-str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
-str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
-if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
-S:writeln(str.."\n")
-S:close()
+  str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
+  str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
+  str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
+  if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
+	if strutil.strlen(event.recurring) then str=str.." "..event.Recur end
+  S:writeln(str.."\n")
+  S:close()
 end
 end
 
@@ -1276,6 +1428,7 @@ print("   -end <datetime>        end time of event (see 'time formats' below)")
 print("   -at <location>         location of event")
 print("   -where <location>      location of event")
 print("   -location <location>   location of event")
+print("   -recur <duration>      event recurrs every '<duration>'. Duration has the format <number><suffix> where suffix can be y=year,m=month,w=week,d=day,h=hour,m=minute. e.g. '-recur 2w' to recur every two weeks.")
 print("   -import <path>         import events from a .ical/.ics file and upload them to a calendar")
 print()
 print("example: almanac.lua -add \"dental appointment\" -start \"2020/01/23\"")
@@ -1427,6 +1580,9 @@ then
 	Config.action="add"
 	NewEvent.Title=ParseArg(args, i+1)
 	NewEvent.Visibility="private"
+elseif arg=="-recur"
+then
+	NewEvent.Recur=ParseArg(args, i+1)
 elseif arg=="-start" or arg=="-s"
 then
 	--do nothing! this is handled by the earlier loop in 'ParseCommandLine'
@@ -1706,30 +1862,6 @@ end
 
 
 
-
-
-
-
-
--- create a blank event object
-function EventCreate()
-local Event={}
-
-Event.Attendees=0
-Event.UTCoffset=0;
-Event.UID=string.format("%x",time.secs())
-Event.Title=""
-Event.Details=""
-Event.Status=""
-Event.Location=""
-Event.Details=""
-Event.Visibility=""
-Event.Start=0
-Event.End=0
-Event.URL=""
-
-return Event
-end
 
 
 

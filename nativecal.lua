@@ -13,6 +13,7 @@ event.Title=toks:next()
 event.Location=toks:next()
 event.Details=strutil.unQuote(toks:next())
 event.URL=strutil.unQuote(toks:next())
+event.Recurs=strutil.unQuote(toks:next())
 event.Status=""
 
 return event
@@ -22,8 +23,7 @@ end
 function AlmanacLoadCalendarFile(Collated, cal, Path)
 local S, str, event, old_event, toks, when
 local tmpTable={}
-
-
+local count=0
 
 S=stream.STREAM(Path)
 if S ~= nil
@@ -56,10 +56,24 @@ do
 	end
 
 	table.insert(Collated, event)
+	count=count+1
+end
+
+return count
+end
+
+
+function AlmanacLoadRecurring(Collated, cal, start_time, end_time)
+local Recurring={}
+local i, event, new_event
+
+AlmanacLoadCalendarFile(Recurring, cal, process.getenv("HOME") .. "/.almanac/recurrent.cal")
+for i,event in ipairs(Recurring)
+do
+	when=EventRecurring(Collated, event, start_time, end_time)
 end
 
 end
-
 
 
 function AlmanacLoadCalendar(Collated, cal, start_time, end_time)
@@ -67,6 +81,8 @@ local str, prev, when
 
 if start_time == nil then start_time=time.secs() end
 if end_time == nil then end_time=time.secs() end
+
+AlmanacLoadRecurring(Collated, cal, start_time, end_time)
 
 when=start_time
 while when <= end_time
@@ -86,16 +102,20 @@ local S, str
 str=process.getenv("HOME") .. "/.almanac/"
 filesys.mkdir(str)
 
-str=str..time.formatsecs("%b-%Y.cal", event.Start)
+if strutil.strlen(event.Recur) > 0 then str=str.."recurrent.cal"
+else str=str..time.formatsecs("%b-%Y.cal", event.Start)
+end
+
 S=stream.STREAM(str, "a")
 if S ~= nil
 then
-str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
-str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
-str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
-if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
-S:writeln(str.."\n")
-S:close()
+  str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
+  str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
+  str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
+  if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
+	if strutil.strlen(event.recurring) then str=str.." "..event.Recur end
+  S:writeln(str.."\n")
+  S:close()
 end
 end
 
