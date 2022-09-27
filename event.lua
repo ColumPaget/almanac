@@ -14,6 +14,7 @@ Event.Visibility=""
 Event.Start=0
 Event.End=0
 Event.URL=""
+Event.src=""
 
 return Event
 end
@@ -35,6 +36,7 @@ Event.Visibility=parent.Visiblity
 Event.Start=parent.Start
 Event.End=parent.End
 Event.URL=parent.URL
+Event.src=parent.src
 
 return Event
 end

@@ -45,6 +45,7 @@ Event.Visibility=""
 Event.Start=0
 Event.End=0
 Event.URL=""
+Event.src=""
 
 return Event
 end
@@ -66,6 +67,7 @@ Event.Visibility=parent.Visiblity
 Event.Start=parent.Start
 Event.End=parent.End
 Event.URL=parent.URL
+Event.src=parent.src
 
 return Event
 end
@@ -487,7 +489,7 @@ if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value..
 		tmpstr=string.gsub(strutil.unQuote(value),"\n\n","\n")
 		Event.Details=strutil.stripCRLF(tmpstr)
 	elseif key=="LOCATION" then LocationParse(Event, value)
-	elseif key=="STATUS" then Event.Status=value
+	elseif key=="STATUS" then Event.Status=string.lower(value)
 	elseif key=="DTSTART" then 
 		Event.Start=ICalParseTime(value, extra)
 	elseif key=="DTEND" then Event.End=ICalParseTime(value, extra)
@@ -502,17 +504,22 @@ ICalPostProcess(Event)
 if config.debug==true then io.stderr:write("ical event:  '"..Event.Title.."' " .. time.formatsecs("%Y/%m/%d", Event.Start).."\n") end
 table.insert(Events, Event)
 
+return Event
 end
 
 
-function ICalLoadEvents(Events, doc)
-local line, str, char1, lines
+function ICalLoadEvents(Events, doc, docname)
+local line, str, char1, lines, event
 
 lines=strutil.TOKENIZER(doc, "\n")
 key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
-	if key=="BEGIN" and value=="VEVENT" then ICalParseEvent(lines, Events) end
+	if key=="BEGIN" and value=="VEVENT" 
+	then 
+		event=ICalParseEvent(lines, Events) 
+		event.src=docname
+	end
 	key,value,extra=ICalNextLine(lines)
 end
 
@@ -841,7 +848,7 @@ return nil
 end
 
 
-function DocumentLoadEvents(Events, url)
+function DocumentLoadEvents(Events, url, DocName)
 local S, doctype, doc
 
 S=OpenCachedDocument(url);
@@ -853,7 +860,7 @@ then
         then
                 RSSLoadEvents(Events, doc)
         else
-                ICalLoadEvents(Events, doc)
+                ICalLoadEvents(Events, doc, DocName)
         end
 else
 print(terminal.format("~rerror: cannot open '"..url.."'~0"))
@@ -861,6 +868,15 @@ end
 
 end
 
+-- document with a tag or name on the front in the form
+---  <name>:<url>
+function NamedDocumentLoadEvents(Events, url)
+local toks, name
+
+toks=strutil.TOKENIZER(url, ":")
+name=toks:next()
+DocumentLoadEvents(Events, toks:remaining(), name)
+end
 
 
 -- FUNCTIONS RELATING TO GOOGLE CALENDAR
@@ -1147,6 +1163,40 @@ end
 
 
 
+function FormatEventStatus(status, format)
+local str=""
+
+str=status
+if status == "confirmed"
+then
+	if format == "color" then str="~g"..status.."~0"
+	elseif format == "short" then str="c"
+	elseif format == "short_color" then str="~gc~0"
+	end
+elseif status == "cancelled"
+then
+	if format == "color" then str="~r"..status.."~0"
+	elseif format == "short" then str="X"
+	elseif format == "short_color" then str="~rX~0"
+	end
+elseif status == "moved"
+then
+	if format == "color" then str="~r"..status.."~0"
+	elseif format == "short" then str="M"
+	elseif format == "short_color" then str="~rM~0"
+	end
+elseif status == "tentative"
+then
+	if format == "color" then str="~y"..status.."~0"
+	elseif format == "short" then str="T"
+	elseif format == "short_color" then str="~yT~0"
+	end
+
+end
+
+return str
+end
+
 --this function substitutes named values like '$(day)' with their actual data
 function SubstituteEventStrings(format, event)
 local toks, str, diff 
@@ -1168,6 +1218,11 @@ values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
 values["status"]=event.Status
+values["status_color"]=FormatEventStatus(event.Status, "color")
+values["status_short"]=FormatEventStatus(event.Status, "short")
+values["status_short_color"]=FormatEventStatus(event.Status, "short_color")
+
+values["src"]=event.src
 values["version"]=VERSION
 
 values["todaynick"]=time.formatsecs("%a", Now)
@@ -1180,7 +1235,6 @@ values["nowyear"]=time.formatsecs("%Y", Now)
 values["nowhour"]=time.formatsecs("%H", Now)
 values["nowmin"]=time.formatsecs("%M", Now)
 values["nowsec"]=time.formatsecs("%S", Now)
-
 
 
 if values["date"]==Today 
@@ -1989,6 +2043,7 @@ then
 	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Events, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Events, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Events, "http://" .. string.sub(cal, 8))
+	elseif string.sub(cal,1, 4) == "src:" then NamedDocumentLoadEvents(Events, string.sub(cal, 5))
 	else DocumentLoadEvents(Events, cal)
 	end
 end
@@ -2088,7 +2143,7 @@ Settings.XtermTitle="Almanac: $(version) Today: $(dayname) $(day) $(monthname)"
 Settings.RefreshTime=ParseDuration("2m")
 
 -- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~r$(status)~0 ~m$(title)~0 $(location)"
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~c$(src)~0 ~r$(status_short_color)~0 ~m$(title)~0 $(location)"
 
 -- When importing from calendars that have long events, or events with open or misconfigured lengths, 
 -- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit

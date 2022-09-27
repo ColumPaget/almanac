@@ -1,4 +1,38 @@
 
+function FormatEventStatus(status, format)
+local str=""
+
+str=status
+if status == "confirmed"
+then
+	if format == "color" then str="~g"..status.."~0"
+	elseif format == "short" then str="c"
+	elseif format == "short_color" then str="~gc~0"
+	end
+elseif status == "cancelled"
+then
+	if format == "color" then str="~r"..status.."~0"
+	elseif format == "short" then str="X"
+	elseif format == "short_color" then str="~rX~0"
+	end
+elseif status == "moved"
+then
+	if format == "color" then str="~r"..status.."~0"
+	elseif format == "short" then str="M"
+	elseif format == "short_color" then str="~rM~0"
+	end
+elseif status == "tentative"
+then
+	if format == "color" then str="~y"..status.."~0"
+	elseif format == "short" then str="T"
+	elseif format == "short_color" then str="~yT~0"
+	end
+
+end
+
+return str
+end
+
 --this function substitutes named values like '$(day)' with their actual data
 function SubstituteEventStrings(format, event)
 local toks, str, diff 
@@ -20,6 +54,11 @@ values["monthnick"]=time.formatsecs("%b", event.Start)
 values["location"]=event.Location
 values["title"]=event.Title
 values["status"]=event.Status
+values["status_color"]=FormatEventStatus(event.Status, "color")
+values["status_short"]=FormatEventStatus(event.Status, "short")
+values["status_short_color"]=FormatEventStatus(event.Status, "short_color")
+
+values["src"]=event.src
 values["version"]=VERSION
 
 values["todaynick"]=time.formatsecs("%a", Now)
@@ -32,7 +71,6 @@ values["nowyear"]=time.formatsecs("%Y", Now)
 values["nowhour"]=time.formatsecs("%H", Now)
 values["nowmin"]=time.formatsecs("%M", Now)
 values["nowsec"]=time.formatsecs("%S", Now)
-
 
 
 if values["date"]==Today 

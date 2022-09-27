@@ -126,7 +126,7 @@ if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value..
 		tmpstr=string.gsub(strutil.unQuote(value),"\n\n","\n")
 		Event.Details=strutil.stripCRLF(tmpstr)
 	elseif key=="LOCATION" then LocationParse(Event, value)
-	elseif key=="STATUS" then Event.Status=value
+	elseif key=="STATUS" then Event.Status=string.lower(value)
 	elseif key=="DTSTART" then 
 		Event.Start=ICalParseTime(value, extra)
 	elseif key=="DTEND" then Event.End=ICalParseTime(value, extra)
@@ -141,17 +141,22 @@ ICalPostProcess(Event)
 if config.debug==true then io.stderr:write("ical event:  '"..Event.Title.."' " .. time.formatsecs("%Y/%m/%d", Event.Start).."\n") end
 table.insert(Events, Event)
 
+return Event
 end
 
 
-function ICalLoadEvents(Events, doc)
-local line, str, char1, lines
+function ICalLoadEvents(Events, doc, docname)
+local line, str, char1, lines, event
 
 lines=strutil.TOKENIZER(doc, "\n")
 key,value,extra=ICalNextLine(lines)
 while key ~= nil
 do
-	if key=="BEGIN" and value=="VEVENT" then ICalParseEvent(lines, Events) end
+	if key=="BEGIN" and value=="VEVENT" 
+	then 
+		event=ICalParseEvent(lines, Events) 
+		event.src=docname
+	end
 	key,value,extra=ICalNextLine(lines)
 end
 

@@ -127,6 +127,7 @@ then
 	elseif string.sub(cal,1, 2) == "g:" then GCalLoadCalendar(Events, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 2) == "m:" then MeetupLoadCalendar(Events, string.sub(cal, 3)) 
 	elseif string.sub(cal,1, 7) == "webcal:" then DocumentLoadEvents(Events, "http://" .. string.sub(cal, 8))
+	elseif string.sub(cal,1, 4) == "src:" then NamedDocumentLoadEvents(Events, string.sub(cal, 5))
 	else DocumentLoadEvents(Events, cal)
 	end
 end
@@ -226,7 +227,7 @@ Settings.XtermTitle="Almanac: $(version) Today: $(dayname) $(day) $(monthname)"
 Settings.RefreshTime=ParseDuration("2m")
 
 -- 'DisplayFormat' is used in 'ansi' output (the default display type) 
-Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~r$(status)~0 ~m$(title)~0 $(location)"
+Settings.DisplayFormat="~c$(daynick_color)~0 $(date) $(time_color) $(duration) ~c$(src)~0 ~r$(status_short_color)~0 ~m$(title)~0 $(location)"
 
 -- When importing from calendars that have long events, or events with open or misconfigured lengths, 
 -- you can set an upper limit on length. This sets a default value of -1 to indicate no such limit

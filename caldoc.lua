@@ -63,7 +63,7 @@ return nil
 end
 
 
-function DocumentLoadEvents(Events, url)
+function DocumentLoadEvents(Events, url, DocName)
 local S, doctype, doc
 
 S=OpenCachedDocument(url);
@@ -75,7 +75,7 @@ then
         then
                 RSSLoadEvents(Events, doc)
         else
-                ICalLoadEvents(Events, doc)
+                ICalLoadEvents(Events, doc, DocName)
         end
 else
 print(terminal.format("~rerror: cannot open '"..url.."'~0"))
@@ -83,3 +83,12 @@ end
 
 end
 
+-- document with a tag or name on the front in the form
+---  <name>:<url>
+function NamedDocumentLoadEvents(Events, url)
+local toks, name
+
+toks=strutil.TOKENIZER(url, ":")
+name=toks:next()
+DocumentLoadEvents(Events, toks:remaining(), name)
+end
