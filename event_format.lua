@@ -124,7 +124,7 @@ do
   then
     str=toks:next()
     if values[str] ~= nil then output=output .. values[str] end
-  elseif strutil.strlen(str) and str ~= ")"
+  elseif strutil.strlen(str) > 0 and str ~= ")"
   then
     output=output..str
   end

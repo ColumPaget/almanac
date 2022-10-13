@@ -112,8 +112,8 @@ then
   str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
   str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
   str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
-  if strutil.strlen(event.URL) then str=str.. " \""..event.URL.."\"" end
-	if strutil.strlen(event.recurring) then str=str.." "..event.Recur end
+  if strutil.strlen(event.URL) > 0 then str=str.. " \""..event.URL.."\"" end
+  if strutil.strlen(event.Recur) > 0 then str=str.." "..event.Recur end
   S:writeln(str.."\n")
   S:close()
 end
