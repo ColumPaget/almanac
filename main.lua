@@ -197,7 +197,14 @@ OutputCalendar(Events, config)
 end
 
 
+function LoadAndSendCalendar(config)
 
+local Events={}
+
+LoadCalendarEvents(config.calendars, config.selections, Events)
+PigeonholedSync(Events, config)
+
+end
 
 
 
@@ -264,6 +271,9 @@ then
 elseif config.action=="convert" or config.action=="convert-email"
 then
 	ConvertItems(config.action, config.selections)
+elseif config.action=="sync"
+then
+	LoadAndSendCalendar(config)
 elseif Settings.Persist==true
 then
 	PersistentScheduleDisplay(config)

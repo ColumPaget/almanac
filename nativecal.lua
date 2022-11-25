@@ -1,7 +1,17 @@
 --FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
 
+function AlmanacParseItem(toks)
+local str
+
+str=toks:next()
+if str == nil then return "" end
+str=strutil.unQuote(str);
+if str == nil then return "" end
+return str
+end
+
 function AlmanacParseCalendarLine(line)
-local event, toks
+local event, toks, str
 
 event=EventCreate()
 toks=strutil.TOKENIZER(line, "\\S", "Q")
@@ -9,11 +19,11 @@ event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
 event.UID=toks:next()
 event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
 event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.Title=toks:next()
-event.Location=toks:next()
-event.Details=strutil.unQuote(toks:next())
-event.URL=strutil.unQuote(toks:next())
-event.Recurs=strutil.unQuote(toks:next())
+event.Title=AlmanacParseItem(toks)
+event.Location=AlmanacParseItem(toks)
+event.Details=AlmanacParseItem(toks)
+event.URL=AlmanacParseItem(toks)
+event.Recurs=AlmanacParseItem(toks)
 event.Status=""
 
 return event
@@ -96,17 +106,22 @@ end
 end
 
 
+
+
 function AlmanacAddEvent(event)
-local S, str
+local S, str, path
 
-str=process.getenv("HOME") .. "/.almanac/"
-filesys.mkdir(str)
-
-if strutil.strlen(event.Recur) > 0 then str=str.."recurrent.cal"
-else str=str..time.formatsecs("%b-%Y.cal", event.Start)
+if strutil.strlen(event.Recur) > 0 then str="recurrent.cal"
+elseif event.Start ~= nil then str=time.formatsecs("%b-%Y.cal", event.Start)
 end
 
-S=stream.STREAM(str, "a")
+if strutil.strlen(str) == 0 then return end
+
+path=process.getenv("HOME") .. "/.almanac/" .. str
+filesys.mkdir(path)
+
+
+S=stream.STREAM(path, "a")
 if S ~= nil
 then
   str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)

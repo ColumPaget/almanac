@@ -1041,8 +1041,18 @@ end
 
 --FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
 
+function AlmanacParseItem(toks)
+local str
+
+str=toks:next()
+if str == nil then return "" end
+str=strutil.unQuote(str);
+if str == nil then return "" end
+return str
+end
+
 function AlmanacParseCalendarLine(line)
-local event, toks
+local event, toks, str
 
 event=EventCreate()
 toks=strutil.TOKENIZER(line, "\\S", "Q")
@@ -1050,11 +1060,11 @@ event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
 event.UID=toks:next()
 event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
 event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.Title=toks:next()
-event.Location=toks:next()
-event.Details=strutil.unQuote(toks:next())
-event.URL=strutil.unQuote(toks:next())
-event.Recurs=strutil.unQuote(toks:next())
+event.Title=AlmanacParseItem(toks)
+event.Location=AlmanacParseItem(toks)
+event.Details=AlmanacParseItem(toks)
+event.URL=AlmanacParseItem(toks)
+event.Recurs=AlmanacParseItem(toks)
 event.Status=""
 
 return event
@@ -1137,17 +1147,22 @@ end
 end
 
 
+
+
 function AlmanacAddEvent(event)
-local S, str
+local S, str, path
 
-str=process.getenv("HOME") .. "/.almanac/"
-filesys.mkdir(str)
-
-if strutil.strlen(event.Recur) > 0 then str=str.."recurrent.cal"
-else str=str..time.formatsecs("%b-%Y.cal", event.Start)
+if strutil.strlen(event.Recur) > 0 then str="recurrent.cal"
+elseif event.Start ~= nil then str=time.formatsecs("%b-%Y.cal", event.Start)
 end
 
-S=stream.STREAM(str, "a")
+if strutil.strlen(str) == 0 then return end
+
+path=process.getenv("HOME") .. "/.almanac/" .. str
+filesys.mkdir(path)
+
+
+S=stream.STREAM(path, "a")
 if S ~= nil
 then
   str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
@@ -1663,6 +1678,10 @@ elseif arg=="-email" or arg=="-convert-email"
 then
 	Config.action="convert-email"
 	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-sync"
+then
+	Config.action="sync"
+	Config.SyncURL=ParseArg(args, i+1)
 elseif arg=="-xt" or arg=="-xterm-title" or arg=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
 elseif arg=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
 elseif arg=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
@@ -1915,6 +1934,114 @@ end
 
 
 
+function PigeonholedAddItem(str, Key, Value)
+
+str=str .. Key .. "=\"" ..strutil.quoteChars(Value, "\n\"") .. "\" "
+return str
+end
+
+
+function PigeonholedSendEvents(Events, S)
+local i, event, str
+
+	for i,event in ipairs(Events)
+	do
+	str="object calendar "..event.UID.." "
+	str=PigeonholedAddItem(str, "uid", event.UID)
+	str=PigeonholedAddItem(str, "title", event.Title)
+	str=PigeonholedAddItem(str, "location", event.Location)
+	str=PigeonholedAddItem(str, "details", event.Details)
+	str=PigeonholedAddItem(str, "url", event.URL)
+	str=PigeonholedAddItem(str, "start", time.formatsecs("%Y/%m/%dT%H:%M:%S", event.Start))
+	str=PigeonholedAddItem(str, "end", time.formatsecs("%Y/%m/%dT%H:%M:%S", event.End))
+	str=str.."\n"
+	S:writeln(str)
+
+	str=S:readln()
+	end
+end
+
+function PigeonholedParseEventProperty(event, str)
+local toks, key
+
+toks=strutil.TOKENIZER(str, "=", "Q")
+key=toks:next()
+
+if key=="uid" then event.UID=toks:next()
+elseif key=="title" then event.Title=toks:next()
+elseif key=="location" then event.Location=toks:next()
+elseif key=="details" then event.Details=toks:next()
+elseif key=="url" then event.URL=toks:next()
+elseif key=="start" then event.Start=time.tosecs("%Y/%m/%dT%H:%M:%S", toks:next())
+elseif key=="end" then event.End=time.tosecs("%Y/%m/%dT%H:%M:%S", toks:next())
+end
+
+end
+
+function PigeonholedEventExists(Events, event) 
+local i, item
+
+for i,item in ipairs(Events)
+do
+	if item.uid==event.uid then return true end
+end
+
+return false
+end
+
+
+function PigeonholedReadEventItem(Events, uid, S)
+local str, toks
+local event={}
+
+S:writeln("read calendar ".. uid .. "\n")
+str=S:readln()
+toks=strutil.TOKENIZER(str, "\\S", "q")
+str=toks:next()
+while str ~= nil
+do
+PigeonholedParseEventProperty(event, str)
+str=toks:next()
+end
+
+if PigeonholedEventExists(Events, event) ~= true then AlmanacAddEvent(event) end
+
+end
+
+
+function PigeonholedReadEvents(Events, S)
+local i, event, str
+
+	S:writeln("list calendar\n")
+	str=S:readln()
+	toks=strutil.TOKENIZER(str, "\\S", "Q")
+	if toks:next() == "+OK"
+	then
+		str=toks:next()
+		while str ~= nil
+		do
+		PigeonholedReadEventItem(Events, str, S)
+		str=toks:next()
+		end
+	end
+
+end
+
+
+
+function PigeonholedSync(Events, config)
+local S
+
+S=stream.STREAM(config.SyncURL)
+if S ~= nil
+then
+PigeonholedSendEvents(Events, S)
+PigeonholedReadEvents(Events, S)
+S:close()
+end
+
+end
+
 
 
 
@@ -2113,7 +2240,14 @@ OutputCalendar(Events, config)
 end
 
 
+function LoadAndSendCalendar(config)
 
+local Events={}
+
+LoadCalendarEvents(config.calendars, config.selections, Events)
+PigeonholedSync(Events, config)
+
+end
 
 
 
@@ -2180,6 +2314,9 @@ then
 elseif config.action=="convert" or config.action=="convert-email"
 then
 	ConvertItems(config.action, config.selections)
+elseif config.action=="sync"
+then
+	LoadAndSendCalendar(config)
 elseif Settings.Persist==true
 then
 	PersistentScheduleDisplay(config)

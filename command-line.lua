@@ -80,6 +80,10 @@ elseif arg=="-email" or arg=="-convert-email"
 then
 	Config.action="convert-email"
 	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-sync"
+then
+	Config.action="sync"
+	Config.SyncURL=ParseArg(args, i+1)
 elseif arg=="-xt" or arg=="-xterm-title" or arg=="-xtitle" then Settings.XtermTitle=ParseArg(args, i+1)
 elseif arg=="-refresh" then Settings.RefreshTime=ParseDuration(ParseArg(args, i+1))
 elseif arg=="-lfmt" then Settings.DisplayFormat=ParseArg(args, i+1)
