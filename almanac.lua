@@ -1288,7 +1288,7 @@ diff=event.End - event.Start
 if diff < 0
 then
 	values["duration"]="??????"
-elseif diff < 3600
+elseif dif ~= nil and diff < 3600
 then
 	values["duration"]=string.format("%dmins", diff / 60)
 else
