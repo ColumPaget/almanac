@@ -118,7 +118,7 @@ end
 if strutil.strlen(str) == 0 then return end
 
 path=process.getenv("HOME") .. "/.almanac/" .. str
-filesys.mkdir(path)
+filesys.mkdirPath(path)
 
 
 S=stream.STREAM(path, "a")
