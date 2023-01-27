@@ -7,21 +7,18 @@ str=S:getvalue("HTTP:Content-Type")
 if strutil.strlen(str) ~= 0
 then
 	Tokens=strutil.TOKENIZER(str, ";")
-	doctype=Tokens:next()
+	doctype=AnalyzeContentType(Tokens:next())
 
 	if doctype=="application/ical" then ext=".ical" 
 	elseif doctype=="application/rss" then ext=".rss"
-	elseif doctype=="text/calendar" 
-	then 
-		ext=".ical"
-		doctype="application/ical"
-	end
+        end
 else
 	str=S:path()
 	if strutil.strlen(str) ~= nil
 	then
 		ext=filesys.extn(filesys.basename(str))
 		if ext==".ical" then doctype="application/ical" 
+		elseif ext==".ics" then doctype="application/ical" 
 		elseif ext==".rss" then doctype="application/rss" 
 		end
 	end
@@ -71,7 +68,7 @@ if S ~= nil
 then
         doctype=DocumentGetType(S)
         doc=S:readdoc()
-        if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml"
+        if doctype=="application/rss" 
         then
                 RSSLoadEvents(Events, doc)
         else

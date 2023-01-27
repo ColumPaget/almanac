@@ -29,6 +29,19 @@ Today=time.formatsecs("%Y/%m/%d", Now)
 Tomorrow=time.formatsecs("%Y/%m/%d", Now+3600*24)
 end
 
+
+-- how is it that no one can ever stick one a single mime type for
+-- a single type of document?
+function AnalyzeContentType(ct)
+
+if ct=="text/calendar" then return "application/ical" end
+if ct=="application/ics" then return "application/ical" end
+
+if ct=="text/xml" then return "application/rss" end
+if ct=="application/rss+xml" then return "application/rss" end
+
+return ct
+end
 -- create a blank event object
 function EventCreate()
 local Event={}
@@ -634,6 +647,7 @@ function EmailHandleContentType(content_type, args)
 local boundary=""
 
 if string.sub(content_type, 1, 10)== "multipart/" then boundary=EmailExtractBoundary(args) end
+content_type=AnalyzeContentType(content_type)
 
 return content_type, boundary
 end
@@ -646,6 +660,7 @@ local name=""
 local value=""
 local args=""
 
+if config.debug==true then io.stderr:write("EMAIL HEADER: "..header.."\n") end
 toks=strutil.TOKENIZER(header, ":|;", "m")
 name=toks:next()
 value=toks:next()
@@ -756,7 +771,7 @@ local mime_info
 mime_info=EmailReadHeaders(S)
 
 if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_type.." enc="..mime_info.encoding.." boundary="..mime_info.boundary.."\n") end
-if mime_info.content_type == "text/calendar"
+if mime_info.content_type == "application/ical"
 then
 	EmailReadDocument(S, boundary, mime_info.encoding, EventsFunc)
 	mime_info.content_type=""
@@ -792,21 +807,18 @@ str=S:getvalue("HTTP:Content-Type")
 if strutil.strlen(str) ~= 0
 then
 	Tokens=strutil.TOKENIZER(str, ";")
-	doctype=Tokens:next()
+	doctype=AnalyzeContentType(Tokens:next())
 
 	if doctype=="application/ical" then ext=".ical" 
 	elseif doctype=="application/rss" then ext=".rss"
-	elseif doctype=="text/calendar" 
-	then 
-		ext=".ical"
-		doctype="application/ical"
-	end
+        end
 else
 	str=S:path()
 	if strutil.strlen(str) ~= nil
 	then
 		ext=filesys.extn(filesys.basename(str))
 		if ext==".ical" then doctype="application/ical" 
+		elseif ext==".ics" then doctype="application/ical" 
 		elseif ext==".rss" then doctype="application/rss" 
 		end
 	end
@@ -856,7 +868,7 @@ if S ~= nil
 then
         doctype=DocumentGetType(S)
         doc=S:readdoc()
-        if doctype=="text/xml" or doctype=="application/rss" or doctype=="application/rss+xml"
+        if doctype=="application/rss" 
         then
                 RSSLoadEvents(Events, doc)
         else
@@ -1703,7 +1715,7 @@ elseif arg=="-?" or arg=="-h" or arg=="-help" or arg=="--help"
 then
 	Config.action="help"
 else
-	if strutil.strlen(arg) > 0 then Config.calendars=Config.calendars..","..arg end
+	if strutil.strlen(arg) > 0 then Config.calendars=Config.calendars..","..strutil.quoteChars(arg, ',') end
 end
 
 end

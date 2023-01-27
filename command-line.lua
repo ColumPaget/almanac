@@ -105,7 +105,7 @@ elseif arg=="-?" or arg=="-h" or arg=="-help" or arg=="--help"
 then
 	Config.action="help"
 else
-	if strutil.strlen(arg) > 0 then Config.calendars=Config.calendars..","..arg end
+	if strutil.strlen(arg) > 0 then Config.calendars=Config.calendars..","..strutil.quoteChars(arg, ',') end
 end
 
 end

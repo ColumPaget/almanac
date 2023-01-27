@@ -20,6 +20,7 @@ function EmailHandleContentType(content_type, args)
 local boundary=""
 
 if string.sub(content_type, 1, 10)== "multipart/" then boundary=EmailExtractBoundary(args) end
+content_type=AnalyzeContentType(content_type)
 
 return content_type, boundary
 end
@@ -32,6 +33,7 @@ local name=""
 local value=""
 local args=""
 
+if config.debug==true then io.stderr:write("EMAIL HEADER: "..header.."\n") end
 toks=strutil.TOKENIZER(header, ":|;", "m")
 name=toks:next()
 value=toks:next()
@@ -142,7 +144,7 @@ local mime_info
 mime_info=EmailReadHeaders(S)
 
 if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_type.." enc="..mime_info.encoding.." boundary="..mime_info.boundary.."\n") end
-if mime_info.content_type == "text/calendar"
+if mime_info.content_type == "application/ical"
 then
 	EmailReadDocument(S, boundary, mime_info.encoding, EventsFunc)
 	mime_info.content_type=""
