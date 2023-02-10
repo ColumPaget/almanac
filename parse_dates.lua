@@ -27,7 +27,7 @@ end
 
 
 --Parse a date from a number of different formats
-function ParseDate(datestr)
+function ParseDate(datestr, Zone)
 local len, lead_digits
 local str=""
 local when=0
@@ -82,7 +82,7 @@ then
 		str=string.sub(datestr,1,4).."-"..string.sub(datestr,6,7).."-"..string.sub(datestr,9,10).."T"..string.sub(datestr,12,13)..":"..string.sub(datestr, 15, 16)..":"..string.sub(datestr, 18)
 end
 
-when=time.tosecs("%Y-%m-%dT%H:%M:%S", str)
+when=time.tosecs("%Y-%m-%dT%H:%M:%S", str, Zone)
 return when
 end
 

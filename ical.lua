@@ -39,10 +39,11 @@ end
 end
 
 
-function ICalParseTime(value, extra)
+function ICalParseTime(value, extra, TZID)
 local Tokens, str, i
 local Timezone=""
 
+if strutil.strlen(TZID) > 0 then Timezone=TZID end
 value=strutil.trim(value);
 
 Tokens=strutil.TOKENIZER(extra,";")
@@ -53,13 +54,12 @@ if string.sub(str,1,5) =="TZID=" then Timezone=string.sub(str,6) end
 str=Tokens:next()
 end
 
---return(time.tosecs("%Y%m%dT%H%M%S", value, Timezone))
-return(ParseDate(value))
+return(ParseDate(value, Timezone))
 end
 
 
 function ICalPostProcessLoopUp(Event)
-local toks, tok
+local toks, tok, when
 
 toks=strutil.TOKENIZER(Event.Details, "\n")
 str=toks:next()
@@ -127,11 +127,13 @@ if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value..
 		Event.Details=strutil.stripCRLF(tmpstr)
 	elseif key=="LOCATION" then LocationParse(Event, value)
 	elseif key=="STATUS" then Event.Status=string.lower(value)
+	elseif key=="TZID" then Event.TZID=value
 	elseif key=="DTSTART" then 
-		Event.Start=ICalParseTime(value, extra)
-	elseif key=="DTEND" then Event.End=ICalParseTime(value, extra)
+		Event.Start=ICalParseTime(value, extra, Event.TZID)
+	elseif key=="DTEND" then Event.End=ICalParseTime(value, extra, Event.TZID)
 	elseif key=="ATTENDEE" then Event.Attendees=Event.Attendees+1 
 	elseif key=="X-MICROSOFT-SKYPETEAMSMEETINGURL" then Event.URL=value
+	elseif key=="X-GOOGLE-CONFERENCE" then Event.URL=value
 	end
 
 	key,value,extra=ICalNextLine(lines)
