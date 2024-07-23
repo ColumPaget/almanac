@@ -72,6 +72,10 @@ elseif arg=="-email" or arg=="-import-email"
 then
 	Config.action="import-email"
 	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-mbox" or arg=="-import-mbox"
+then
+	Config.action="import-mbox"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
 elseif arg=="-convert"
 then
 	Config.action="convert"

@@ -1,9 +1,40 @@
+email_bounds={}
+email_bounds.boundary=1
+email_bounds.final_boundary=2
+email_bounds.mbox=3
+
+
+function EmailCheckBoundary(S, line, boundary, mailfile_type)
+local cleaned, final
+local RetVal=0
+
+	cleaned=strutil.trim(line)
+
+	if strutil.strlen(boundary) > 0  
+	then 
+	   if cleaned == ("--"..boundary.."--") then RetVal=email_bounds.final_boundary
+	   elseif cleaned == ("--" .. boundary) then RetVal=email_bounds.boundary
+	   end
+	elseif mailfile_type=="mbox"
+	then
+		while line == "\r\n" or line == "\n"
+		do
+			line=S:readln()
+		end
+		if line==nil then return email_bounds.final_boundary,nil end
+		if string.sub(line, 1, 5)=="From " then RetVal=email_bounds.mbox end
+	end
+
+return RetVal, line
+end
+
+
 -- Functions related to extracting ical and other files from emails
 function EmailExtractBoundary(header)
 local toks, str
 local boundary=""
 
-toks=strutil.TOKENIZER(header, "\\S")
+toks=strutil.TOKENIZER(header, "\\S|;", "m")
 str=toks:next()
 while str~= nil
 do
@@ -43,12 +74,15 @@ then
 	value=string.lower(strutil.stripLeadingWhitespace(value))
 	args=toks:remaining()
 
-	if name=="content-type" 
+	if name == "content-type" 
 	then 
 	mime_info.content_type,mime_info.boundary=EmailHandleContentType(value, args) 
-	elseif name=="content-transfer-encoding"
+	elseif name == "content-transfer-encoding"
 	then
 	mime_info.encoding=value
+	elseif name == "subject"
+	then
+	--print("SUBJECT: " .. args)
 	end
 end
 
@@ -66,6 +100,7 @@ mime_info.boundary=""
 mime_info.encoding=""
 
 line=S:readln()
+if line == nil then return nil end
 while line ~= nil
 do
 	line=strutil.stripTrailingWhitespace(line);
@@ -88,21 +123,29 @@ end
 
 
 
-function EmailReadDocument(S, boundary, encoding, EventsFunc)
-local line, event, i, len
+function EmailReadDocument(S, boundary, encoding, mailfile_type, EventsFunc)
+local line, event, i, len, cleaned
 local doc=""
 local Events={}
+local Done=false
 
 if config.debug==true then io.stderr:write("extract:  enc="..encoding.." boundary="..boundary.."\n") end
+
 len=strutil.strlen(boundary)
 line=S:readln()
 while line ~= nil
 do
-	if len > 0 and string.sub(line, 1, len) == boundary then break end
-	if encoding=="base64" then line=strutil.trim(line) end
-	doc=doc..line
-	line=S:readln()
+ bound_found=EmailCheckBoundary(S, line, boundary, mailfile_type)
+ if bound_found==email_bounds.boundary and strutil.strlen(doc) > 0 then break
+ elseif bound_found==email_bounds.final_boundary then Done=true; break
+ elseif bound_found==email_bounds.mbox then Done=true; break
+ end
+
+ if encoding=="base64" then line=strutil.trim(line) end
+ doc=doc..line
+ line=S:readln()
 end
+
 
 if encoding=="base64"
 then
@@ -121,51 +164,73 @@ do
 	EventsFunc(event)
 end
 
+return Done
 end
 
 
-function EmailHandleMimeContainer(S, mime_info, EventsFunc)
-local str, boundary
+function EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+local str
 
-boundary="--" .. mime_info.boundary
 str=S:readln()
 while str ~= nil
 do
+
+	bound_found,str=EmailCheckBoundary(S, str, mime_info.boundary, mailfile_type)
 	str=strutil.stripTrailingWhitespace(str)
-	if str==boundary then EmailHandleMimeItem(S, boundary, EventsFunc) end
+
+	if bound_found > email_bounds.boundary then break end
+	if bound_found > 0 then Done=EmailHandleMimeItem(S, mime_info.boundary, mailfile_type, EventsFunc) end
+
+	if Done==true then break end
 	str=S:readln()
 end
+
 end
 
 
-function EmailHandleMimeItem(S, boundary, EventsFunc)
+function EmailHandleMimeItem(S, boundary, mailfile_type, EventsFunc)
 local mime_info
+local Done=false
 
 mime_info=EmailReadHeaders(S)
 
 if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_type.." enc="..mime_info.encoding.." boundary="..mime_info.boundary.."\n") end
+
+if  strutil.strlen(mime_info.boundary) == 0 then mime_info.boundary=boundary end
+
+
 if mime_info.content_type == "application/ical"
 then
-	EmailReadDocument(S, boundary, mime_info.encoding, EventsFunc)
+	Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 	mime_info.content_type=""
-elseif mime_info.content_type == "multipart/mixed"
+elseif string.sub(mime_info.content_type, 1, 10) == "multipart/"
 then
-	EmailHandleMimeContainer(S, mime_info, EventsFunc)
+	EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+else
+	--Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 end
 
+return Done
 end
 
 
 
-function EmailExtractCalendarItems(path, EventsFunc)
+function EmailExtractCalendarItems(path, mailfile_type, EventsFunc)
 local S, mime_info, boundary, str
 
 S=stream.STREAM(path, "r")
 if S ~= nil
 then
 if config.debug==true then io.stderr:write("open email '"..path.."\n") end
+
 mime_info=EmailReadHeaders(S)
-EmailHandleMimeContainer(S, mime_info, EventsFunc)
+while mime_info ~= nil
+do
+EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+mime_info=EmailReadHeaders(S)
+end
+
+
 S:close()
 end
 

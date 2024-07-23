@@ -84,46 +84,50 @@ Events can also be uploaded to google calendars that the user has permission for
 
 ```
 options:
-   -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
-   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
-   -d <n>      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
-   -day  <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
-   -days <n>   show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
-   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
-   -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
-   -m <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
-   -month <n>  show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
-   -y <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
-   -year <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
-   -at <loc>   show events at location 'loc'
-   -where <loc>     show events at location 'loc'
-   -location <loc>  show events at location 'loc'
-   -hide <pattern>  hide events whose title matches fnmatch/shell style pattern 'pattern'
-   -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'
-   -detail     print event description/details
-   -details    print event description/details
-   -show-url   print event with event connect url (for Zoom or Teams meetings) on a line below
-   -old        show events that are in the past
-   -import <url>  Import events from specified URL (usually an ical file) into calendar
-   -import-email <url>  Import events from ical attachments within an email file at the specified URL into calendar
-   -persist    don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.
-   -convert <url>  Output events from specified URL (usually an ical file) in output format set with '-of'
-   -convert-email <url>  Output events from ical attachments within an email file at the specified URL in format set with '-of'
+   -h <n>                         show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
+   -hour <n>                      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed
+   -d <n>                         show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
+   -day  <n>                      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
+   -days <n>                      show events for the next 'n' days. The 'n' argument is optional, if missing 1 day will be assumed
+   -w <n>                         show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
+   -week <n>                      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed
+   -m <n>                         show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
+   -month <n>                     show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 month will be assumed
+   -y <n>                         show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
+   -year <n>                      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 year will be assumed
+   -at <loc>                      show events at location 'loc'
+   -where <loc>                   show events at location 'loc'
+   -location <loc>                show events at location 'loc'
+   -hide <pattern>                hide events whose title matches fnmatch/shell style pattern 'pattern'
+   -show <pattern>                show only events whose title matches fnmatch/shell style pattern 'pattern'
+   -detail                        print event description/details
+   -details                       print event description/details
+   -show-url                      print event with event connect url (for Zoom or Teams meetings) on a line below
+   -old                           show events that are in the past
+   -import <url>                  Import events from specified URL (usually an ical file) into calendar
+   -import-email <url>            Import events from ical attachments within an email file at the specified URL into calendar
+   -email <url>                   Import events from ical attachments within an email file at the specified URL into calendar
+   -mbox <url>                    Import events from an mbox file of emails. Has been seen to work with at least Thunderbird's mbox format.
+   -import-mbox <url>             Import events from an mbox file of emails. Has been seen to work with at least Thunderbird's mbox format.
+   -mbox <url>                    Import events from an mbox file of emails. Has been seen to work with at least Thunderbird's mbox format.
+   -persist                       don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.
+   -convert <url>                 Output events from specified URL (usually an ical file) in output format set with '-of'
+   -convert-email <url>           Output events from ical attachments within an email file at the specified URL in format set with '-of'
    -lfmt <format string>          line format for ansi output (see 'display formats' for details of title strings)
    -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
    -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)
-   -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
+   -of <fmt>                      specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details
    -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.
-   -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
-   -u         Terminal supports unicode up to code 0x8000
-   -unicode   Terminal supports unicode up to code 0x8000
-   -u2        Terminal supports unicode up to code 0x8000
-   -unicode2  Terminal supports unicode up to code 0x10000
-   -?          This help
-   -h          This help
-   -help       This help
-   --help      This help
+   -maxlen <len>                  When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.
+   -u                             Terminal supports unicode up to code 0x8000
+   -unicode                       Terminal supports unicode up to code 0x8000
+   -u2                            Terminal supports unicode up to code 0x8000
+   -unicode2                      Terminal supports unicode up to code 0x10000
+   -?                             This help
+   -h                             This help
+   -help                          This help
+   --help                         This help
 
 ```
 

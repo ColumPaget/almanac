@@ -1,7 +1,7 @@
 
 
 function ParseDuration(str)
-local pos, multiplier
+local pos, multiplier, val, retval
 
 pos=CountDigits(str)
 val=string.sub(str, 1, pos)
@@ -19,6 +19,8 @@ retval=tonumber(val) * 3600 * 24
 elseif multiplier == "w"
 then
 retval=tonumber(val) * 3600 * 24 * 7
+else
+retval=tonumber(val)
 end
 
 return retval

@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="4.0"
+VERSION="5.0"
 Settings={}
 EventsNewest=0
 Now=0
@@ -224,7 +224,7 @@ end
 
 
 function ParseDuration(str)
-local pos, multiplier
+local pos, multiplier, val, retval
 
 pos=CountDigits(str)
 val=string.sub(str, 1, pos)
@@ -242,6 +242,8 @@ retval=tonumber(val) * 3600 * 24
 elseif multiplier == "w"
 then
 retval=tonumber(val) * 3600 * 24 * 7
+else
+retval=tonumber(val)
 end
 
 return retval
@@ -627,12 +629,43 @@ end
 
 
 
+email_bounds={}
+email_bounds.boundary=1
+email_bounds.final_boundary=2
+email_bounds.mbox=3
+
+
+function EmailCheckBoundary(S, line, boundary, mailfile_type)
+local cleaned, final
+local RetVal=0
+
+	cleaned=strutil.trim(line)
+
+	if strutil.strlen(boundary) > 0  
+	then 
+	   if cleaned == ("--"..boundary.."--") then RetVal=email_bounds.final_boundary
+	   elseif cleaned == ("--" .. boundary) then RetVal=email_bounds.boundary
+	   end
+	elseif mailfile_type=="mbox"
+	then
+		while line == "\r\n" or line == "\n"
+		do
+			line=S:readln()
+		end
+		if line==nil then return email_bounds.final_boundary,nil end
+		if string.sub(line, 1, 5)=="From " then RetVal=email_bounds.mbox end
+	end
+
+return RetVal, line
+end
+
+
 -- Functions related to extracting ical and other files from emails
 function EmailExtractBoundary(header)
 local toks, str
 local boundary=""
 
-toks=strutil.TOKENIZER(header, "\\S")
+toks=strutil.TOKENIZER(header, "\\S|;", "m")
 str=toks:next()
 while str~= nil
 do
@@ -672,12 +705,15 @@ then
 	value=string.lower(strutil.stripLeadingWhitespace(value))
 	args=toks:remaining()
 
-	if name=="content-type" 
+	if name == "content-type" 
 	then 
 	mime_info.content_type,mime_info.boundary=EmailHandleContentType(value, args) 
-	elseif name=="content-transfer-encoding"
+	elseif name == "content-transfer-encoding"
 	then
 	mime_info.encoding=value
+	elseif name == "subject"
+	then
+	--print("SUBJECT: " .. args)
 	end
 end
 
@@ -695,6 +731,7 @@ mime_info.boundary=""
 mime_info.encoding=""
 
 line=S:readln()
+if line == nil then return nil end
 while line ~= nil
 do
 	line=strutil.stripTrailingWhitespace(line);
@@ -717,21 +754,29 @@ end
 
 
 
-function EmailReadDocument(S, boundary, encoding, EventsFunc)
-local line, event, i, len
+function EmailReadDocument(S, boundary, encoding, mailfile_type, EventsFunc)
+local line, event, i, len, cleaned
 local doc=""
 local Events={}
+local Done=false
 
 if config.debug==true then io.stderr:write("extract:  enc="..encoding.." boundary="..boundary.."\n") end
+
 len=strutil.strlen(boundary)
 line=S:readln()
 while line ~= nil
 do
-	if len > 0 and string.sub(line, 1, len) == boundary then break end
-	if encoding=="base64" then line=strutil.trim(line) end
-	doc=doc..line
-	line=S:readln()
+ bound_found=EmailCheckBoundary(S, line, boundary, mailfile_type)
+ if bound_found==email_bounds.boundary and strutil.strlen(doc) > 0 then break
+ elseif bound_found==email_bounds.final_boundary then Done=true; break
+ elseif bound_found==email_bounds.mbox then Done=true; break
+ end
+
+ if encoding=="base64" then line=strutil.trim(line) end
+ doc=doc..line
+ line=S:readln()
 end
+
 
 if encoding=="base64"
 then
@@ -750,51 +795,73 @@ do
 	EventsFunc(event)
 end
 
+return Done
 end
 
 
-function EmailHandleMimeContainer(S, mime_info, EventsFunc)
-local str, boundary
+function EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+local str
 
-boundary="--" .. mime_info.boundary
 str=S:readln()
 while str ~= nil
 do
+
+	bound_found,str=EmailCheckBoundary(S, str, mime_info.boundary, mailfile_type)
 	str=strutil.stripTrailingWhitespace(str)
-	if str==boundary then EmailHandleMimeItem(S, boundary, EventsFunc) end
+
+	if bound_found > email_bounds.boundary then break end
+	if bound_found > 0 then Done=EmailHandleMimeItem(S, mime_info.boundary, mailfile_type, EventsFunc) end
+
+	if Done==true then break end
 	str=S:readln()
 end
+
 end
 
 
-function EmailHandleMimeItem(S, boundary, EventsFunc)
+function EmailHandleMimeItem(S, boundary, mailfile_type, EventsFunc)
 local mime_info
+local Done=false
 
 mime_info=EmailReadHeaders(S)
 
 if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_type.." enc="..mime_info.encoding.." boundary="..mime_info.boundary.."\n") end
+
+if  strutil.strlen(mime_info.boundary) == 0 then mime_info.boundary=boundary end
+
+
 if mime_info.content_type == "application/ical"
 then
-	EmailReadDocument(S, boundary, mime_info.encoding, EventsFunc)
+	Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 	mime_info.content_type=""
-elseif mime_info.content_type == "multipart/mixed"
+elseif string.sub(mime_info.content_type, 1, 10) == "multipart/"
 then
-	EmailHandleMimeContainer(S, mime_info, EventsFunc)
+	EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+else
+	--Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 end
 
+return Done
 end
 
 
 
-function EmailExtractCalendarItems(path, EventsFunc)
+function EmailExtractCalendarItems(path, mailfile_type, EventsFunc)
 local S, mime_info, boundary, str
 
 S=stream.STREAM(path, "r")
 if S ~= nil
 then
 if config.debug==true then io.stderr:write("open email '"..path.."\n") end
+
 mime_info=EmailReadHeaders(S)
-EmailHandleMimeContainer(S, mime_info, EventsFunc)
+while mime_info ~= nil
+do
+EmailHandleMimeContainer(S, mime_info, mailfile_type, EventsFunc)
+mime_info=EmailReadHeaders(S)
+end
+
+
 S:close()
 end
 
@@ -1085,10 +1152,24 @@ return event
 end
 
 
-function AlmanacLoadCalendarFile(Collated, cal, Path)
-local S, str, event, old_event, toks, when
-local tmpTable={}
-local count=0
+function AlmanacEventsMatch(Event1, Event2)
+if Event1 == nil and Event2 == nil then return true end
+if Event1 == nil or Event2 == nil then return false end
+if Event1.UID ~= Event2.UID then return false end
+if Event1.Start ~= Event2.Start then return false end
+if Event1.End ~= Event2.End then return false end
+if Event1.Title ~= Event2.Title then return false end
+if Event1.Location ~= Event2.Location then return false end
+if Event1.Details ~= Event2.Details then return false end
+if Event1.URL ~= Event2.URL then return false end
+return true
+end
+
+
+
+function AlmanacReadCalendarFile(Path)
+local S, str, event, old_event
+local events={}
 
 S=stream.STREAM(Path)
 if S ~= nil
@@ -1097,20 +1178,36 @@ str=S:readln()
 while str ~= nil
 do
 	event=AlmanacParseCalendarLine(str)
-	old_event=tmpTable[event.UID]
+	old_event=events[event.UID]
 	if old_event ~= nil
 	then
+	-- don't re-add event if this new one is identical
+	if AlmanacEventsMatch(old_event, event) then break end
+
+	--if not identical, then mark the event as moved
 	old_event.Status="moved"
-	tmpTable[old_event.UID.."-moved"]=old_event
+	events[old_event.UID.."-moved"]=old_event
 	end
 
-	tmpTable[event.UID]=event
+	--add new event
+	events[event.UID]=event
 	str=S:readln()
 end
 S:close()
 end
 
+return events
+end
 
+
+
+function AlmanacLoadCalendarFile(Collated, cal, Path)
+local str, key, event, when
+local tmpTable={}
+local count=0
+
+
+tmpTable=AlmanacReadCalendarFile(Path)
 for key,event in pairs(tmpTable)
 do
 	when=Settings.WarnTime
@@ -1164,7 +1261,7 @@ end
 
 
 function AlmanacAddEvent(event)
-local S, str, path
+local S, str, path, events, exising
 
 if strutil.strlen(event.Recur) > 0 then str="recurrent.cal"
 elseif event.Start ~= nil then str=time.formatsecs("%b-%Y.cal", event.Start)
@@ -1175,7 +1272,10 @@ if strutil.strlen(str) == 0 then return end
 path=process.getenv("HOME") .. "/.almanac/" .. str
 filesys.mkdirPath(path)
 
-
+events=AlmanacReadCalendarFile(path)
+old_event=events[event.UID]
+if AlmanacEventsMatch(old_event, event) ~= true
+then
 S=stream.STREAM(path, "a")
 if S ~= nil
 then
@@ -1189,6 +1289,8 @@ then
 end
 end
 
+
+end
 
 
 
@@ -1459,47 +1561,50 @@ print("ical and rss webcalendars are identified by a url as normal.")
 print("Events can also be uploaded to google calendars that the user has permission for. If pushing events to a user's google calendar, or displaying events from it, this can be specified as 'g:primary'")
 print()
 print("options:")
-print("   -h <n>      show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -hour <n>   show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -d <n>      show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -day  <n>   show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -days <n>   show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
-print("   -w <n>      show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
-print("   -week <n>   show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
-print("   -m <n>      show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
-print("   -month <n>  show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
-print("   -y <n>      show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
-print("   -year <n>   show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
-print("   -at <loc>   show events at location 'loc'")
-print("   -where <loc>     show events at location 'loc'")
-print("   -location <loc>  show events at location 'loc'")
-print("   -hide <pattern>  hide events whose title matches fnmatch/shell style pattern 'pattern'")
-print("   -show <pattern>  show only events whose title matches fnmatch/shell style pattern 'pattern'")
-print("   -detail     print event description/details")
-print("   -details    print event description/details")
-print("   -show-url   print event with event connect url (for Zoom or Teams meetings) on a line below")
-print("   -old        show events that are in the past")
-print("   -import <url>  Import events from specified URL (usually an ical file) into calendar")
-print("   -import-email <url>  Import events from ical attachments within an email file at the specified URL into calendar")
-print("   -persist    don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.")
-print("   -convert <url>  Output events from specified URL (usually an ical file) in output format set with '-of'")
+print("   -h <n>                show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -hour <n>             show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -d <n>                show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -day  <n>             show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -days <n>             show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
+print("   -w <n>                show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
+print("   -week <n>             show events for the next 'n' weeks. The 'n' argument is optional, if missing 1 week will be assumed")
+print("   -m <n>                show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
+print("   -month <n>            show events for the next 'n' months. The 'n' argument is optional, if missing 1 month will be assumed")
+print("   -y <n>                show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
+print("   -year <n>             show events for the next 'n' years. The 'n' argument is optional, if missing 1 year will be assumed")
+print("   -at <loc>             show events at location 'loc'")
+print("   -where <loc>          show events at location 'loc'")
+print("   -location <loc>       show events at location 'loc'")
+print("   -hide <pattern>       hide events whose title matches fnmatch/shell style pattern 'pattern'")
+print("   -show <pattern>       show only events whose title matches fnmatch/shell style pattern 'pattern'")
+print("   -detail               print event description/details")
+print("   -details              print event description/details")
+print("   -show-url             print event with event connect url (for Zoom or Teams meetings) on a line below")
+print("   -old                  show events that are in the past")
+print("   -import <url>         Import events from specified URL (usually an ical file) into calendar")
+print("   -email <url>          Import events from ical attachments within an email file at the specified URL into calendar")
+print("   -import-email <url>   Import events from ical attachments within an email file at the specified URL into calendar")
+print("   -mbox  <url>          Import events from ical attachments within an mbox file full of emails")
+print("   -import-mbox  <url>   Import events from ical attachments within an mbox file full of emails")
+print("   -persist              don't exit, but print out events in a loop. This can be used to create an updating window that displays upcoming events.")
+print("   -convert <url>        Output events from specified URL (usually an ical file) in output format set with '-of'")
 print("   -convert-email <url>  Output events from ical attachments within an email file at the specified URL in format set with '-of'")
 print("   -lfmt <format string>          line format for ansi output (see 'display formats' for details of title strings)")
 print("   -xt <title string>             when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
 print("   -xtitle <title string>         when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
 print("   -xterm-title <title string>    when -persist is used, also set the xterm title to be <title string> (see 'display formats' for details of title strings)")
-print("   -of <fmt>   specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details")
-print("   -refresh <len>                 when in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.")
-print("   -maxlen <len>     When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.")
-print("   -u         Terminal supports unicode up to code 0x8000")
-print("   -unicode   Terminal supports unicode up to code 0x8000")
-print("   -u2        Terminal supports unicode up to code 0x8000")
-print("   -unicode2  Terminal supports unicode up to code 0x10000")
-print("   -debug     Print debug output")
-print("   -?          This help")
-print("   -h          This help")
-print("   -help       This help")
-print("   --help      This help")
+print("   -of <fmt>             specify format to output. '<fmt> will be one of 'csv', 'ical', 'sgical', 'txt' or 'ansi'. Default is 'ansi'. See 'Output Formats' below for more details")
+print("   -refresh <len>        When in persist mode, update with this frequency, where 'len' is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes. Default 2m.")
+print("   -maxlen <len>         When importing calendars set the max length of an event to <len> where len is a number postfixed by 'm' 'h' 'd' or 'w' for 'minutes', 'hours', 'days' or 'weeks'. e.g. '2d' two days, '30m' thiry minutes.")
+print("   -u                    Terminal supports unicode up to code 0x8000")
+print("   -unicode              Terminal supports unicode up to code 0x8000")
+print("   -u2                   Terminal supports unicode up to code 0x8000")
+print("   -unicode2             Terminal supports unicode up to code 0x10000")
+print("   -debug                Print debug output")
+print("   -?                    This help")
+print("   -h                    This help")
+print("   -help                 This help")
+print("   --help                This help")
 print()
 print("ADD EVENTS")
 print("The following options all relate to inserting an event into an almanac or a google calendar. if calendar is specified then the default almanac calendar (a:default) is assumed. You can instead use the user's primary google calendar by specifiying 'g:primary'")
@@ -1683,6 +1788,10 @@ then
 elseif arg=="-email" or arg=="-import-email"
 then
 	Config.action="import-email"
+	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
+elseif arg=="-mbox" or arg=="-import-mbox"
+then
+	Config.action="import-mbox"
 	Config.selections=Config.selections..ParseArg(args, i+1).."\n"
 elseif arg=="-convert"
 then
@@ -2210,9 +2319,12 @@ toks=strutil.TOKENIZER(items, "\n")
 url=toks:next()
 while url ~= nil
 do
-	if action=="import-email"
+	if action=="import-mbox"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent)
+	EmailExtractCalendarItems(url, AlmanacAddEvent, "mbox")
+	elseif action=="import-email"
+	then
+	EmailExtractCalendarItems(url, AlmanacAddEvent, "email")
 	else
 	ImportEventsToCalendar(url, calendars)
 	end
@@ -2232,7 +2344,7 @@ while url ~= nil
 do
 	if action=="convert-email"
 	then
-	EmailExtractCalendarItems(url, OutputEvent)
+	EmailExtractCalendarItems(url, OutputEvent, "email")
 	else
 	DocumentLoadEvents(Events, url)
 	OutputCalendar(Events, config)
@@ -2322,7 +2434,7 @@ elseif config.action=="add"
 then
 	AlmanacAddEvent(event)
 	--if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
-elseif config.action=="import" or config.action=="import-email"
+elseif config.action=="import" or config.action=="import-email" or config.action=="import-mbox"
 then
 	ImportItems(config.action, config.selections)
 elseif config.action=="convert" or config.action=="convert-email"

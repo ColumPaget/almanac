@@ -153,9 +153,12 @@ toks=strutil.TOKENIZER(items, "\n")
 url=toks:next()
 while url ~= nil
 do
-	if action=="import-email"
+	if action=="import-mbox"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent)
+	EmailExtractCalendarItems(url, AlmanacAddEvent, "mbox")
+	elseif action=="import-email"
+	then
+	EmailExtractCalendarItems(url, AlmanacAddEvent, "email")
 	else
 	ImportEventsToCalendar(url, calendars)
 	end
@@ -175,7 +178,7 @@ while url ~= nil
 do
 	if action=="convert-email"
 	then
-	EmailExtractCalendarItems(url, OutputEvent)
+	EmailExtractCalendarItems(url, OutputEvent, "email")
 	else
 	DocumentLoadEvents(Events, url)
 	OutputCalendar(Events, config)
@@ -265,7 +268,7 @@ elseif config.action=="add"
 then
 	AlmanacAddEvent(event)
 	--if strutil.strlen(NewEvent.Title) > 0 then GCalAddEvent(calendars, NewEvent) end
-elseif config.action=="import" or config.action=="import-email"
+elseif config.action=="import" or config.action=="import-email" or config.action=="import-mbox"
 then
 	ImportItems(config.action, config.selections)
 elseif config.action=="convert" or config.action=="convert-email"

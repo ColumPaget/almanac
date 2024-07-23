@@ -30,10 +30,24 @@ return event
 end
 
 
-function AlmanacLoadCalendarFile(Collated, cal, Path)
-local S, str, event, old_event, toks, when
-local tmpTable={}
-local count=0
+function AlmanacEventsMatch(Event1, Event2)
+if Event1 == nil and Event2 == nil then return true end
+if Event1 == nil or Event2 == nil then return false end
+if Event1.UID ~= Event2.UID then return false end
+if Event1.Start ~= Event2.Start then return false end
+if Event1.End ~= Event2.End then return false end
+if Event1.Title ~= Event2.Title then return false end
+if Event1.Location ~= Event2.Location then return false end
+if Event1.Details ~= Event2.Details then return false end
+if Event1.URL ~= Event2.URL then return false end
+return true
+end
+
+
+
+function AlmanacReadCalendarFile(Path)
+local S, str, event, old_event
+local events={}
 
 S=stream.STREAM(Path)
 if S ~= nil
@@ -42,20 +56,36 @@ str=S:readln()
 while str ~= nil
 do
 	event=AlmanacParseCalendarLine(str)
-	old_event=tmpTable[event.UID]
+	old_event=events[event.UID]
 	if old_event ~= nil
 	then
+	-- don't re-add event if this new one is identical
+	if AlmanacEventsMatch(old_event, event) then break end
+
+	--if not identical, then mark the event as moved
 	old_event.Status="moved"
-	tmpTable[old_event.UID.."-moved"]=old_event
+	events[old_event.UID.."-moved"]=old_event
 	end
 
-	tmpTable[event.UID]=event
+	--add new event
+	events[event.UID]=event
 	str=S:readln()
 end
 S:close()
 end
 
+return events
+end
 
+
+
+function AlmanacLoadCalendarFile(Collated, cal, Path)
+local str, key, event, when
+local tmpTable={}
+local count=0
+
+
+tmpTable=AlmanacReadCalendarFile(Path)
 for key,event in pairs(tmpTable)
 do
 	when=Settings.WarnTime
@@ -109,7 +139,7 @@ end
 
 
 function AlmanacAddEvent(event)
-local S, str, path
+local S, str, path, events, exising
 
 if strutil.strlen(event.Recur) > 0 then str="recurrent.cal"
 elseif event.Start ~= nil then str=time.formatsecs("%b-%Y.cal", event.Start)
@@ -120,7 +150,10 @@ if strutil.strlen(str) == 0 then return end
 path=process.getenv("HOME") .. "/.almanac/" .. str
 filesys.mkdirPath(path)
 
-
+events=AlmanacReadCalendarFile(path)
+old_event=events[event.UID]
+if AlmanacEventsMatch(old_event, event) ~= true
+then
 S=stream.STREAM(path, "a")
 if S ~= nil
 then
@@ -134,5 +167,7 @@ then
 end
 end
 
+
+end
 
 
