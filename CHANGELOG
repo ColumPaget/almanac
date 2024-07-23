@@ -1,0 +1,62 @@
+v6,0 (2024-07-23)
+  * added -import-mbox option
+  * add CHANGELOG
+  * Create LICENSE
+
+v5,0 (2023-02-10)
+  * Support google meeting invites. Support timezones in .ical files
+  * Add 'application/ics' to list of recognized mime types
+  * fix native calendar breakage
+  * added -sync
+  * fix issues relating to checking for null strings
+  * named calendar sources
+  * initial work on recurring events
+
+v4,0 (2022-09-06)
+  * changes to handle google's new oauth policy
+  * add more debug
+  * enable moving through calendar in persist mode
+
+v3,0 (2022-08-26)
+  * make .almanac directrory
+  * add makefile
+  * fix remote calendar display
+  * Organize code into units. Show native calendar items outside of current month
+  * If no end-time specified, make it an hour from the start
+  * fix issues that arise when no end-date supplied
+  * added 'status' to display
+  * gather more MS Teams info
+  * handle negative day/hour/etc number
+  * add LoopUp support
+  * changes to handle zoom/teams URLs. Added '-convert' option
+  * bugfix for crash on opening unknown document types
+  * display 'no events to display' if not events match query
+
+v2.2 (2021-01-13)
+  * handle quoted-printable email import
+  * Handle multiple levels of mime 'multipart' containers
+  * Improvements for importing emails
+
+v2.1 (2020-07-30)
+  * added -warn and -warn-raise options. Window raising fixed. documentation updates
+  * added dayname, daynick, daynick_color, value types. Added -refresh option for persist mode
+  * fix markdown in README.md
+
+v2.0 (2020-01-20)
+  * import from email, local events db, change output formats, persist mode, etc
+  * start work on native calendar storage
+
+v1.5 (2018-01-01)
+  * lookup by hour, turn on/off unicode output,
+
+v1.5 (2017-12-27)
+  * added 'hours' query and error message when url fails to open
+
+v1.3 (2017-12-21)
+  * fix for crash when no StartDate set. Now supports webcal:// urls
+
+v1.2 (2017-12-19)
+  * Only ask for google calendar OAuth when needed. Give instructions to user about how to do oauth
+
+v1.0 (2017-12-17)
+  * initial release
