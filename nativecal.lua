@@ -13,6 +13,7 @@ end
 function AlmanacParseCalendarLine(line)
 local event, toks, str
 
+if config.debug==true then io.stderr:write("nativefile parse: ".. tostring(line) .."\n") end
 event=EventCreate()
 toks=strutil.TOKENIZER(line, "\\S", "Q")
 event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
@@ -44,9 +45,32 @@ return true
 end
 
 
+function AlmanacAddCalendarItem(events, new_event)
+local old_event
+
+	old_event=events[event.UID]
+	if old_event ~= nil
+	then
+	   -- don't re-add event if this new one is identical
+	   if AlmanacEventsMatch(old_event, new_event) 
+	   then
+        	if config.debug==true then io.stderr:write("nativefile duplicate event: ".. tostring(new_event.Title) .."\n") end
+	   	return 
+	   end
+
+	   --if not identical, then mark the event as moved
+	   old_event.Status="moved"
+	   events[old_event.UID.."-moved"]=old_event
+	end
+
+	--add new event
+       	if config.debug==true then io.stderr:write("nativefile load event: ".. tostring(new_event.Title) .."\n") end
+	events[new_event.UID]=new_event
+end
+
 
 function AlmanacReadCalendarFile(Path)
-local S, str, event, old_event
+local S, str, event
 local events={}
 
 S=stream.STREAM(Path)
@@ -56,19 +80,8 @@ str=S:readln()
 while str ~= nil
 do
 	event=AlmanacParseCalendarLine(str)
-	old_event=events[event.UID]
-	if old_event ~= nil
-	then
-	-- don't re-add event if this new one is identical
-	if AlmanacEventsMatch(old_event, event) then break end
-
-	--if not identical, then mark the event as moved
-	old_event.Status="moved"
-	events[old_event.UID.."-moved"]=old_event
-	end
-
-	--add new event
-	events[event.UID]=event
+        if config.debug==true then io.stderr:write("nativefile read event: ".. tostring(event.Title) .."\n") end
+	AlmanacAddCalendarItem(events, event)
 	str=S:readln()
 end
 S:close()

@@ -199,7 +199,7 @@ if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_typ
 if  strutil.strlen(mime_info.boundary) == 0 then mime_info.boundary=boundary end
 
 
-if mime_info.content_type == "application/ical"
+if mime_info.content_type == "application/ical" or mime_info.content_type == "text/calendar"
 then
 	Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 	mime_info.content_type=""

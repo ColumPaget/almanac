@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="5.0"
+VERSION="6.0"
 Settings={}
 EventsNewest=0
 Now=0
@@ -830,7 +830,7 @@ if config.debug==true then io.stderr:write("mime item: ".. mime_info.content_typ
 if  strutil.strlen(mime_info.boundary) == 0 then mime_info.boundary=boundary end
 
 
-if mime_info.content_type == "application/ical"
+if mime_info.content_type == "application/ical" or mime_info.content_type == "text/calendar"
 then
 	Done=EmailReadDocument(S, mime_info.boundary, mime_info.encoding, mailfile_type, EventsFunc)
 	mime_info.content_type=""
@@ -1135,6 +1135,7 @@ end
 function AlmanacParseCalendarLine(line)
 local event, toks, str
 
+if config.debug==true then io.stderr:write("nativefile parse: ".. tostring(line) .."\n") end
 event=EventCreate()
 toks=strutil.TOKENIZER(line, "\\S", "Q")
 event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
@@ -1166,9 +1167,32 @@ return true
 end
 
 
+function AlmanacAddCalendarItem(events, new_event)
+local old_event
+
+	old_event=events[event.UID]
+	if old_event ~= nil
+	then
+	   -- don't re-add event if this new one is identical
+	   if AlmanacEventsMatch(old_event, new_event) 
+	   then
+        	if config.debug==true then io.stderr:write("nativefile duplicate event: ".. tostring(new_event.Title) .."\n") end
+	   	return 
+	   end
+
+	   --if not identical, then mark the event as moved
+	   old_event.Status="moved"
+	   events[old_event.UID.."-moved"]=old_event
+	end
+
+	--add new event
+       	if config.debug==true then io.stderr:write("nativefile load event: ".. tostring(new_event.Title) .."\n") end
+	events[new_event.UID]=new_event
+end
+
 
 function AlmanacReadCalendarFile(Path)
-local S, str, event, old_event
+local S, str, event
 local events={}
 
 S=stream.STREAM(Path)
@@ -1178,19 +1202,8 @@ str=S:readln()
 while str ~= nil
 do
 	event=AlmanacParseCalendarLine(str)
-	old_event=events[event.UID]
-	if old_event ~= nil
-	then
-	-- don't re-add event if this new one is identical
-	if AlmanacEventsMatch(old_event, event) then break end
-
-	--if not identical, then mark the event as moved
-	old_event.Status="moved"
-	events[old_event.UID.."-moved"]=old_event
-	end
-
-	--add new event
-	events[event.UID]=event
+        if config.debug==true then io.stderr:write("nativefile read event: ".. tostring(event.Title) .."\n") end
+	AlmanacAddCalendarItem(events, event)
 	str=S:readln()
 end
 S:close()
@@ -2193,6 +2206,9 @@ local result=false
 
 if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
 
+if config.debug==true then io.stderr:write("EventVisible: " .. tostring(event.Title) .. " start=".. tostring(event.Start) .. " end=" .. tostring(event.End) .."\n") end
+
+
 if event.Start == nil then return false end
 if event.Start < config.EventsStart then return false end
 if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end
@@ -2243,6 +2259,7 @@ function OutputCalendar(Events, config)
 local i, event
 local displayed_events_count=0
 
+if config.debug==true then io.stderr:write("Output Calendar: " .. #Events .." items\n") end
 if Settings.OutputFormat=="csv" then OutputCSVHeader(Out) 
 elseif Settings.OutputFormat=="ical" then OutputICALHeader(Out) 
 elseif Settings.OutputFormat=="sgical" then OutputSGIcalHeader(Out) 
@@ -2321,10 +2338,10 @@ while url ~= nil
 do
 	if action=="import-mbox"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent, "mbox")
+	EmailExtractCalendarItems(url, "mbox", AlmanacAddEvent)
 	elseif action=="import-email"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent, "email")
+	EmailExtractCalendarItems(url, "email", AlmanacAddEvent)
 	else
 	ImportEventsToCalendar(url, calendars)
 	end
@@ -2344,7 +2361,7 @@ while url ~= nil
 do
 	if action=="convert-email"
 	then
-	EmailExtractCalendarItems(url, OutputEvent, "email")
+	EmailExtractCalendarItems(url, "email", OutputEvent)
 	else
 	DocumentLoadEvents(Events, url)
 	OutputCalendar(Events, config)

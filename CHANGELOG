@@ -1,9 +1,15 @@
-v6,0 (2024-07-23)
+v6.1 (2024-07-23)
+  * fix errors with -import-email added in v6.0
+  * add debugging for 'nativefile' code
+  * add CHANGELOG
+  * Create LICENSE
+
+v6.0 (2024-07-23)
   * added -import-mbox option
   * add CHANGELOG
   * Create LICENSE
 
-v5,0 (2023-02-10)
+v5.0 (2023-02-10)
   * Support google meeting invites. Support timezones in .ical files
   * Add 'application/ics' to list of recognized mime types
   * fix native calendar breakage
@@ -12,12 +18,12 @@ v5,0 (2023-02-10)
   * named calendar sources
   * initial work on recurring events
 
-v4,0 (2022-09-06)
+v4.0 (2022-09-06)
   * changes to handle google's new oauth policy
   * add more debug
   * enable moving through calendar in persist mode
 
-v3,0 (2022-08-26)
+v3.0 (2022-08-26)
   * make .almanac directrory
   * add makefile
   * fix remote calendar display

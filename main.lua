@@ -27,6 +27,9 @@ local result=false
 
 if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
 
+if config.debug==true then io.stderr:write("EventVisible: " .. tostring(event.Title) .. " start=".. tostring(event.Start) .. " end=" .. tostring(event.End) .."\n") end
+
+
 if event.Start == nil then return false end
 if event.Start < config.EventsStart then return false end
 if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end
@@ -77,6 +80,7 @@ function OutputCalendar(Events, config)
 local i, event
 local displayed_events_count=0
 
+if config.debug==true then io.stderr:write("Output Calendar: " .. #Events .." items\n") end
 if Settings.OutputFormat=="csv" then OutputCSVHeader(Out) 
 elseif Settings.OutputFormat=="ical" then OutputICALHeader(Out) 
 elseif Settings.OutputFormat=="sgical" then OutputSGIcalHeader(Out) 
@@ -155,10 +159,10 @@ while url ~= nil
 do
 	if action=="import-mbox"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent, "mbox")
+	EmailExtractCalendarItems(url, "mbox", AlmanacAddEvent)
 	elseif action=="import-email"
 	then
-	EmailExtractCalendarItems(url, AlmanacAddEvent, "email")
+	EmailExtractCalendarItems(url, "email", AlmanacAddEvent)
 	else
 	ImportEventsToCalendar(url, calendars)
 	end
@@ -178,7 +182,7 @@ while url ~= nil
 do
 	if action=="convert-email"
 	then
-	EmailExtractCalendarItems(url, OutputEvent, "email")
+	EmailExtractCalendarItems(url, "email", OutputEvent)
 	else
 	DocumentLoadEvents(Events, url)
 	OutputCalendar(Events, config)
