@@ -29,7 +29,6 @@ if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") en
 
 if config.debug==true then io.stderr:write("EventVisible: " .. tostring(event.Title) .. " start=".. tostring(event.Start) .. " end=" .. tostring(event.End) .."\n") end
 
-
 if event.Start == nil then return false end
 if event.Start < config.EventsStart then return false end
 if config.EventsEnd > 0 and event.Start > config.EventsEnd then return false end

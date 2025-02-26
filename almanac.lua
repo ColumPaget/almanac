@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="6.0"
+VERSION="6.2"
 Settings={}
 EventsNewest=0
 Now=0
@@ -382,11 +382,15 @@ function ICalNextLine(lines)
 local toks, tok, key, extra, line
 
 line=UnSplitLine(lines)
+
 if line==nil then return nil end
 
 toks=strutil.TOKENIZER(line,":|;","ms")
 key=toks:next()
 tok=toks:next()
+
+if key==nil then key="" end
+
 while tok==";"
 do
 	tok=toks:next()
@@ -483,6 +487,15 @@ end
 end
 
 
+
+--[[
+not fully handled:
+ORGANIZER:mailto:simon.mcdonald@gxo.com
+ATTENDEE:mailto:colum.paget@axiomgb.com
+CATEGORIES:Energy: Accelerating the Transition through Open Source
+CLASS:PUBLIC
+]]--
+
 function ICalParseEvent(lines, Events)
 local key, value, extra, tmpstr
 local Event
@@ -512,6 +525,7 @@ if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value..
 	elseif key=="ATTENDEE" then Event.Attendees=Event.Attendees+1 
 	elseif key=="X-MICROSOFT-SKYPETEAMSMEETINGURL" then Event.URL=value
 	elseif key=="X-GOOGLE-CONFERENCE" then Event.URL=value
+	elseif key=="URL" then Event.URL=value
 	end
 
 	key,value,extra=ICalNextLine(lines)
@@ -1574,6 +1588,7 @@ print("ical and rss webcalendars are identified by a url as normal.")
 print("Events can also be uploaded to google calendars that the user has permission for. If pushing events to a user's google calendar, or displaying events from it, this can be specified as 'g:primary'")
 print()
 print("options:")
+print("   -old                  show events that are in the past")
 print("   -h <n>                show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -hour <n>             show events for the next 'n' hours. The 'n' argument is optional, if missing 1 day will be assumed")
 print("   -d <n>                show events for the next 'n' days.  The 'n' argument is optional, if missing 1 day will be assumed")
@@ -1593,7 +1608,6 @@ print("   -show <pattern>       show only events whose title matches fnmatch/she
 print("   -detail               print event description/details")
 print("   -details              print event description/details")
 print("   -show-url             print event with event connect url (for Zoom or Teams meetings) on a line below")
-print("   -old                  show events that are in the past")
 print("   -import <url>         Import events from specified URL (usually an ical file) into calendar")
 print("   -email <url>          Import events from ical attachments within an email file at the specified URL into calendar")
 print("   -import-email <url>   Import events from ical attachments within an email file at the specified URL into calendar")
@@ -1827,7 +1841,8 @@ then
 elseif arg=="-show"
 then
 	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
-elseif arg=="-old" then Config.EventsStart=0
+elseif arg=="-old" then 
+Config.EventsStart=0
 elseif arg=="-persist" then Settings.Persist=true 
 elseif arg=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
 elseif arg=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
@@ -1870,7 +1885,7 @@ do
 if arg=="-s" or arg=="-start" then Config.EventsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
-if Config.EventsStart==0 then Config.EventsStart=time.secs() end
+--if Config.EventsStart==0 then Config.EventsStart=time.secs() end
 
 
 for i,arg in ipairs(args)
@@ -1889,8 +1904,6 @@ then
 	Config.EventsStart=Config.EventsEnd
 	Config.EventsEnd=val
 	end
-else
-	Config.EventsEnd=Config.EventsStart + 3600
 end
 
 NewEvent.Start=Config.EventsStart
@@ -2207,7 +2220,6 @@ local result=false
 if config.EventsStart==nil then io.stderr:write("ERROR: Events start==nil\n") end
 
 if config.debug==true then io.stderr:write("EventVisible: " .. tostring(event.Title) .. " start=".. tostring(event.Start) .. " end=" .. tostring(event.End) .."\n") end
-
 
 if event.Start == nil then return false end
 if event.Start < config.EventsStart then return false end

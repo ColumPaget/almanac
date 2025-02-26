@@ -1,3 +1,8 @@
+v6.2 (2025-02-26)
+  * handle ical files that have blank lines between events
+  * support 'URL' field in ical files
+  * fix '-old' option by not setting 'EventsEnd' when 'EventsStart' is zero
+
 v6.1 (2024-07-23)
   * fix errors with -import-email added in v6.0
   * add debugging for 'nativefile' code

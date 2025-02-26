@@ -4,11 +4,15 @@ function ICalNextLine(lines)
 local toks, tok, key, extra, line
 
 line=UnSplitLine(lines)
+
 if line==nil then return nil end
 
 toks=strutil.TOKENIZER(line,":|;","ms")
 key=toks:next()
 tok=toks:next()
+
+if key==nil then key="" end
+
 while tok==";"
 do
 	tok=toks:next()
@@ -105,6 +109,15 @@ end
 end
 
 
+
+--[[
+not fully handled:
+ORGANIZER:mailto:simon.mcdonald@gxo.com
+ATTENDEE:mailto:colum.paget@axiomgb.com
+CATEGORIES:Energy: Accelerating the Transition through Open Source
+CLASS:PUBLIC
+]]--
+
 function ICalParseEvent(lines, Events)
 local key, value, extra, tmpstr
 local Event
@@ -134,6 +147,7 @@ if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value..
 	elseif key=="ATTENDEE" then Event.Attendees=Event.Attendees+1 
 	elseif key=="X-MICROSOFT-SKYPETEAMSMEETINGURL" then Event.URL=value
 	elseif key=="X-GOOGLE-CONFERENCE" then Event.URL=value
+	elseif key=="URL" then Event.URL=value
 	end
 
 	key,value,extra=ICalNextLine(lines)

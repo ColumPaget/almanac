@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="6.1"
+VERSION="6.2"
 Settings={}
 EventsNewest=0
 Now=0

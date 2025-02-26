@@ -97,7 +97,8 @@ then
 elseif arg=="-show"
 then
 	if strutil.strlen(Config.selections) > 0 then Config.selections=Config.selections..","..ParseArg(args,i+1) else Config.selections=ParseArg(args, i+1) end
-elseif arg=="-old" then Config.EventsStart=0
+elseif arg=="-old" then 
+Config.EventsStart=0
 elseif arg=="-persist" then Settings.Persist=true 
 elseif arg=="-warn" then Settings.WarnTime=ParseDuration(ParseArg(args, i+1))
 elseif arg=="-warn-raise" then Settings.WarnRaisedTime=ParseDuration(ParseArg(args, i+1))
@@ -140,9 +141,6 @@ do
 if arg=="-s" or arg=="-start" then Config.EventsStart=ParseDate(ParseArg(args, i+1)) end
 end
 
-if Config.EventsStart==0 then Config.EventsStart=time.secs() end
-
-
 for i,arg in ipairs(args)
 do
  ParseCommandLineArg(arg, i, args, NewEvent, Config)
@@ -159,8 +157,6 @@ then
 	Config.EventsStart=Config.EventsEnd
 	Config.EventsEnd=val
 	end
-else
-	Config.EventsEnd=Config.EventsStart + 3600
 end
 
 NewEvent.Start=Config.EventsStart
