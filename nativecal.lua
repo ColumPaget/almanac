@@ -193,6 +193,7 @@ old_event=events[event.UID]
 
 if AlmanacEventsMatch(old_event, event) ~= true
 then
+
 S=stream.STREAM(path, "a")
 if S ~= nil
 then

@@ -1,3 +1,6 @@
+v6.4 (2025-03-06)
+  * don't include timezone and attendee count in UID
+
 v6.3 (2025-03-06)
   * use internal ID to track events that have the same UID, but are modified versions of themselves
 

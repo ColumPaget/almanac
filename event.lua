@@ -7,8 +7,6 @@ local str=""
 local uid
 
 str=Event.EID 
-if Event.Attendees ~= nil then str=str .. Event.Attendees end
-if Event.UTCoffset ~= nil then str=str .. Event.UTCoffset end
 if Event.Title ~= nil then str=str .. Event.Title end
 if Event.Details ~= nil then str=str .. Event.Details end
 if Event.Status ~= nil then str=str .. Event.Status end

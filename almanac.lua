@@ -10,7 +10,7 @@ require("time")
 require("hash")
 
 
-VERSION="6.2"
+VERSION="6.4"
 Settings={}
 EventsNewest=0
 Now=0
@@ -42,14 +42,15 @@ if ct=="application/rss+xml" then return "application/rss" end
 
 return ct
 end
-
+-- event uids (now called EID) are not truely unique
+-- if an event is modified it keeps the same EID
+-- this function generates a truely unique ID for
+-- an event
 function EventGenerateUID(Event)
 local str=""
 local uid
 
 str=Event.EID 
-if Event.Attendees ~= nil then str=str .. Event.Attendees end
-if Event.UTCoffset ~= nil then str=str .. Event.UTCoffset end
 if Event.Title ~= nil then str=str .. Event.Title end
 if Event.Details ~= nil then str=str .. Event.Details end
 if Event.Status ~= nil then str=str .. Event.Status end
@@ -1237,8 +1238,9 @@ local old_event
 	   end
 
 	   --if not identical, then mark the event as moved
+	   --this probably can't happen since switching to internal
+	   --UIDs
 	   old_event.Status="moved"
-	   events[old_event.UID.."-moved"]=old_event
 	end
 
 	--add new event
@@ -1351,6 +1353,7 @@ old_event=events[event.UID]
 
 if AlmanacEventsMatch(old_event, event) ~= true
 then
+
 S=stream.STREAM(path, "a")
 if S ~= nil
 then
