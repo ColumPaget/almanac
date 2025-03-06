@@ -21,7 +21,7 @@ Out:writeln(string.format("Start [%d]\n", diff / 60))
 diff=(event.End - event.Start)
 if Settings.MaxEventLength > -1 and diff > Settings.MaxEventLength then diff=Settings.MaxEventLength end
 Out:writeln(string.format("Length [%d]\n", diff / 60))
-Out:writeln("Uid ["..event.UID.."]\n")
+Out:writeln("Uid ["..event.EID.."]\n")
 str="Contents [" .. event.Title
 if strutil.strlen(event.Location) > 0 then str=str.. "\nAt: " .. event.Location end
 if strutil.strlen(event.Description) > 0 then str=str.. "\n" .. event.Description end

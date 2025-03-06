@@ -1,14 +1,29 @@
 --FUNCTIONS RELATED TO NATIVE ALMANAC CALENDARS
 
-function AlmanacParseItem(toks)
+function AlmanacParseItem(event, toks, field)
 local str
 
 str=toks:next()
-if str == nil then return "" end
 str=strutil.unQuote(str);
-if str == nil then return "" end
+if str==nil then str="" end
+
+if str ~= ""
+then
+if string.sub(str, 1, 4) == "url=" then event.URL=strutil.stripQuotes(string.sub(str, 5)) 
+elseif string.sub(str, 1, 6) == "title=" then event.Title=strutil.stripQuotes(string.sub(str, 7)) 
+elseif string.sub(str, 1, 6) == "recur=" then event.Recurs=strutil.stripQuotes(string.sub(str, 7)) 
+elseif string.sub(str, 1, 7) == "status=" then event.Status=strutil.stripQuotes(string.sub(str, 8)) 
+elseif string.sub(str, 1, 9) == "location=" then event.Location=strutil.stripQuotes(string.sub(str, 10)) 
+else event[field]=str
+end
+end
+
 return str
 end
+
+
+
+
 
 function AlmanacParseCalendarLine(line)
 local event, toks, str
@@ -17,15 +32,15 @@ if config.debug==true then io.stderr:write("nativefile parse: ".. tostring(line)
 event=EventCreate()
 toks=strutil.TOKENIZER(line, "\\S", "Q")
 event.Added=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.UID=toks:next()
+event.EID=toks:next()
 event.Start=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
 event.End=time.tosecs("%Y/%m/%d.%H:%M:%S", toks:next())
-event.Title=AlmanacParseItem(toks)
-event.Location=AlmanacParseItem(toks)
-event.Details=AlmanacParseItem(toks)
-event.URL=AlmanacParseItem(toks)
-event.Recurs=AlmanacParseItem(toks)
-event.Status=""
+AlmanacParseItem(event, toks, "Title")
+AlmanacParseItem(event, toks, "Location")
+AlmanacParseItem(event, toks, "Details")
+AlmanacParseItem(event, toks, "URL")
+AlmanacParseItem(event, toks, "Recurs")
+AlmanacParseItem(event, toks, "Status")
 
 return event
 end
@@ -34,12 +49,14 @@ end
 function AlmanacEventsMatch(Event1, Event2)
 if Event1 == nil and Event2 == nil then return true end
 if Event1 == nil or Event2 == nil then return false end
-if Event1.UID ~= Event2.UID then return false end
+
+if Event1.EID ~= Event2.EID then return false end
 if Event1.Start ~= Event2.Start then return false end
 if Event1.End ~= Event2.End then return false end
 if Event1.Title ~= Event2.Title then return false end
 if Event1.Location ~= Event2.Location then return false end
-if Event1.Details ~= Event2.Details then return false end
+
+--if Event1.Details ~= Event2.Details then return false end
 if Event1.URL ~= Event2.URL then return false end
 return true
 end
@@ -48,7 +65,9 @@ end
 function AlmanacAddCalendarItem(events, new_event)
 local old_event
 
-	old_event=events[event.UID]
+	new_event.UID=EventGenerateUID(new_event)
+
+	old_event=events[new_event.UID]
 	if old_event ~= nil
 	then
 	   -- don't re-add event if this new one is identical
@@ -59,12 +78,14 @@ local old_event
 	   end
 
 	   --if not identical, then mark the event as moved
+	   --this probably can't happen since switching to internal
+	   --UIDs
 	   old_event.Status="moved"
-	   events[old_event.UID.."-moved"]=old_event
 	end
 
 	--add new event
-       	if config.debug==true then io.stderr:write("nativefile load event: ".. tostring(new_event.Title) .."\n") end
+  if config.debug==true then io.stderr:write("nativefile load event: ".. tostring(new_event.Title) .."\n") end
+
 	events[new_event.UID]=new_event
 end
 
@@ -80,7 +101,8 @@ str=S:readln()
 while str ~= nil
 do
 	event=AlmanacParseCalendarLine(str)
-        if config.debug==true then io.stderr:write("nativefile read event: ".. tostring(event.Title) .."\n") end
+
+  if config.debug==true then io.stderr:write("nativefile read event: ".. tostring(event.Title) .."\n") end
 	AlmanacAddCalendarItem(events, event)
 	str=S:readln()
 end
@@ -154,6 +176,8 @@ end
 function AlmanacAddEvent(event)
 local S, str, path, events, exising
 
+event.UID=EventGenerateUID(event)
+
 if strutil.strlen(event.Recur) > 0 then str="recurrent.cal"
 elseif event.Start ~= nil then str=time.formatsecs("%b-%Y.cal", event.Start)
 end
@@ -165,16 +189,20 @@ filesys.mkdirPath(path)
 
 events=AlmanacReadCalendarFile(path)
 old_event=events[event.UID]
+
+
 if AlmanacEventsMatch(old_event, event) ~= true
 then
 S=stream.STREAM(path, "a")
 if S ~= nil
 then
-  str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.UID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
+  str=time.format("%Y/%m/%d.%H:%M:%S") .. " " .. event.EID .. " "..time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.Start)
   str=str .. time.formatsecs("%Y/%m/%d.%H:%M:%S ", event.End)
   str=str .. "\"" .. event.Title .. "\" \""..event.Location.."\" \"" .. strutil.quoteChars(event.Details, "\n\\\"") .."\""
-  if strutil.strlen(event.URL) > 0 then str=str.. " \""..event.URL.."\"" end
-  if strutil.strlen(event.Recur) > 0 then str=str.." "..event.Recur end
+  if strutil.strlen(event.URL) > 0 then str=str.. " url=\""..event.URL.."\"" end
+  if strutil.strlen(event.Recur) > 0 then str=str.." recur=\""..event.Recur.."\"" end
+  str=str.." status=\""..event.Status .. "\""
+
   S:writeln(str.."\n")
   S:close()
 end

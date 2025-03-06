@@ -1,3 +1,6 @@
+v6.3 (2025-03-06)
+  * use internal ID to track events that have the same UID, but are modified versions of themselves
+
 v6.2 (2025-02-26)
   * handle ical files that have blank lines between events
   * support 'URL' field in ical files

@@ -11,8 +11,8 @@ local i, event, str
 
 	for i,event in ipairs(Events)
 	do
-	str="object calendar "..event.UID.." "
-	str=PigeonholedAddItem(str, "uid", event.UID)
+	str="object calendar "..event.EID.." "
+	str=PigeonholedAddItem(str, "uid", event.EID)
 	str=PigeonholedAddItem(str, "title", event.Title)
 	str=PigeonholedAddItem(str, "location", event.Location)
 	str=PigeonholedAddItem(str, "details", event.Details)
@@ -32,7 +32,7 @@ local toks, key
 toks=strutil.TOKENIZER(str, "=", "Q")
 key=toks:next()
 
-if key=="uid" then event.UID=toks:next()
+if key=="uid" then event.EID=toks:next()
 elseif key=="title" then event.Title=toks:next()
 elseif key=="location" then event.Location=toks:next()
 elseif key=="details" then event.Details=toks:next()

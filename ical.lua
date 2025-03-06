@@ -129,7 +129,7 @@ do
 if config.debug==true then io.stderr:write("ical parse:  '"..key.."'='"..value.."\n") end
 
 	if key=="END" and value=="VEVENT" then break
-	elseif key=="UID" then Event.UID=value 
+	elseif key=="UID" then Event.EID=value 
 	elseif key=="BEGIN" then ICalReadPastSubItem(lines, value)
 	elseif key=="SUMMARY" then 
 		tmpstr=string.gsub(strutil.unQuote(value),"\n"," ")
